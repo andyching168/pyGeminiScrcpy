@@ -340,6 +340,10 @@ class ScrcpyClient:
         server_path = self._get_server_path()
         remote_path = "/data/local/tmp/scrcpy-server.jar"
         
+        # Generate a random SCID (8 hex digits) to avoid socket name collisions
+        import random
+        scid = f"{random.randint(0, 0x7FFFFFFF):08x}"
+        
         print(f"Deploying server from {server_path}...")
         
         # Push server to device
@@ -349,7 +353,7 @@ class ScrcpyClient:
         
         # Set up port forwarding
         self._run_adb("forward", "--remove-all")
-        result = self._run_adb("forward", f"tcp:{self.local_port}", "localabstract:scrcpy")
+        result = self._run_adb("forward", f"tcp:{self.local_port}", f"localabstract:scrcpy_{scid}")
         if result.returncode != 0:
             raise RuntimeError(f"Failed to forward port: {result.stderr.decode()}")
         
@@ -363,6 +367,7 @@ class ScrcpyClient:
             f"CLASSPATH=/data/local/tmp/scrcpy-server.jar",
             "app_process", "/", "com.genymobile.scrcpy.Server",
             SCRCPY_SERVER_VERSION,
+            f"scid={scid}",           # Use custom SCID
             f"log_level=debug",  # Changed to debug for better diagnostics
             f"video_bit_rate={self.bitrate}",
             f"max_size={self.max_width}",

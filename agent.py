@@ -244,9 +244,9 @@ class GeminiAgent:
             
             distance = 500  # pixels to scroll
             if direction == "down":
-                end_y = actual_y - distance
-            elif direction == "up":
                 end_y = actual_y + distance
+            elif direction == "up":
+                end_y = actual_y - distance
             elif direction == "left":
                 self._adb_shell(["input", "swipe", str(actual_x), str(actual_y), str(actual_x + distance), str(actual_y), "300"])
                 return {"status": "scrolled", "direction": direction, "url": "android://device"}
@@ -267,18 +267,12 @@ class GeminiAgent:
             end_x, end_y = actual_x, actual_y
 
             if direction == "down":
-                end_y = actual_y - distance
-            elif direction == "up":
                 end_y = actual_y + distance
+            elif direction == "up":
+                end_y = actual_y - distance
             elif direction == "left":
-                end_x = actual_x - distance # Scroll right to see left? No, swipe left moves content left, seeing right.
-                # Wait, "scroll left" usually means "I want to see content to the left".
-                # So I swipe RIGHT (drag content right).
-                # ADB implementation above: left -> swipe to x+distance? 
-                # ADB code: if direction == "left": swipe x to x+distance. (Drag Right).
                 end_x = actual_x + distance
             else:  # right
-                # "Scroll right" -> see content to the right. Swipe LEFT.
                 end_x = actual_x - distance
             
             # Helper for swipe

@@ -1,0 +1,7 @@
+Traceback (most recent call last):
+  File "<string>", line 1, in <module>
+  File "/home/ac/miniconda3/envs/gemini_android/lib/python3.12/site-packages/scrcpy/__init__.py", line 6, in <module>
+    from .core import Client
+  File "/home/ac/miniconda3/envs/gemini_android/lib/python3.12/site-packages/scrcpy/core.py", line 11, in <module>
+    from adbutils import AdbDevice, AdbError, Network, _AdbStreamConnection, adb
+ImportError: cannot import name '_AdbStreamConnection' from 'adbutils' (/home/ac/miniconda3/envs/gemini_android/lib/python3.12/site-packages/adbutils/__init__.py)

@@ -1,0 +1,11 @@
+Checking scrcpy-server...
+Size: 56955 bytes
+Header: b'PK\x03\x04'
+Valid ZIP/JAR. Contents:
+ - META-INF/com/android/build/gradle/app-metadata.properties
+ - classes.dex
+ - AndroidManifest.xml
+ - resources.arsc
+
+--- debug_output.txt content ---
+

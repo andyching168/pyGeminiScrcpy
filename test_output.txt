@@ -1,0 +1,6 @@
+Traceback (most recent call last):
+  File "/home/ac/pyGeminiScrcpy/test_controls.py", line 1, in <module>
+    from scrcpy_client import ScrcpyClient, ACTION_DOWN, ACTION_UP, KEYCODE_HOME, KEYCODE_BACK, KEYEVENT_ACTION_DOWN, KEYEVENT_ACTION_UP
+  File "/home/ac/pyGeminiScrcpy/scrcpy_client.py", line 16, in <module>
+    import cv2
+ModuleNotFoundError: No module named 'cv2'

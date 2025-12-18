@@ -1,0 +1,92 @@
+Requirement already satisfied: scrcpy-client in /home/ac/miniconda3/envs/gemini_android/lib/python3.12/site-packages (0.4.1)
+Collecting adbutils<0.15.0,>=0.14.1 (from scrcpy-client)
+  Using cached adbutils-0.14.1.tar.gz (161 kB)
+  Installing build dependencies: started
+  Installing build dependencies: finished with status 'done'
+  Getting requirements to build wheel: started
+  Getting requirements to build wheel: finished with status 'done'
+  Installing backend dependencies: started
+  Installing backend dependencies: finished with status 'done'
+  Preparing metadata (pyproject.toml): started
+  Preparing metadata (pyproject.toml): finished with status 'done'
+Collecting av<10.0.0,>=9.2.0 (from scrcpy-client)
+  Using cached av-9.2.0.tar.gz (2.4 MB)
+  Installing build dependencies: started
+  Installing build dependencies: finished with status 'done'
+  Getting requirements to build wheel: started
+  Getting requirements to build wheel: finished with status 'error'
+  error: subprocess-exited-with-error
+  
+  × Getting requirements to build wheel did not run successfully.
+  │ exit code: 1
+  ╰─> [66 lines of output]
+      Compiling av/utils.pyx because it changed.
+      [1/1] Cythonizing av/utils.pyx
+      Compiling av/stream.pyx because it changed.
+      [1/1] Cythonizing av/stream.pyx
+      Compiling av/plane.pyx because it changed.
+      [1/1] Cythonizing av/plane.pyx
+      Compiling av/packet.pyx because it changed.
+      [1/1] Cythonizing av/packet.pyx
+      Compiling av/option.pyx because it changed.
+      [1/1] Cythonizing av/option.pyx
+      performance hint: av/logging.pyx:232:0: Exception check on 'log_callback' will always require the GIL to be acquired.
+      Possible solutions:
+          1. Declare 'log_callback' as 'noexcept' if you control the definition and you're sure you don't want the function to raise exceptions.
+          2. Use an 'int' return type on 'log_callback' to allow an error code to be returned.
+      
+      Error compiling Cython file:
+      ------------------------------------------------------------
+      ...
+      cdef const char *log_context_name(void *ptr) nogil:
+          cdef log_context *obj = <log_context*>ptr
+          return obj.name
+      
+      cdef lib.AVClass log_class
+      log_class.item_name = log_context_name
+                            ^
+      ------------------------------------------------------------
+      av/logging.pyx:216:22: Cannot assign type 'const char *(void *) except? NULL nogil' to 'const char *(*)(void *) noexcept nogil'. Exception values are incompatible. Suggest adding 'noexcept' to the type of 'log_context_name'.
+      
+      Error compiling Cython file:
+      ------------------------------------------------------------
+      ...
+      
+      # Start the magic!
+      # We allow the user to fully disable the logging system as it will not play
+      # nicely with subinterpreters due to FFmpeg-created threads.
+      if os.environ.get('PYAV_LOGGING') != 'off':
+          lib.av_log_set_callback(log_callback)
+                                  ^
+      ------------------------------------------------------------
+      av/logging.pyx:351:28: Cannot assign type 'void (void *, int, const char *, va_list) except * nogil' to 'av_log_callback' (alias of 'void (*)(void *, int, const char *, va_list) noexcept nogil'). Exception values are incompatible. Suggest adding 'noexcept' to the type of 'log_callback'.
+      Compiling av/logging.pyx because it changed.
+      [1/1] Cythonizing av/logging.pyx
+      Traceback (most recent call last):
+        File "/home/ac/miniconda3/envs/gemini_android/lib/python3.12/site-packages/pip/_vendor/pyproject_hooks/_in_process/_in_process.py", line 389, in <module>
+          main()
+        File "/home/ac/miniconda3/envs/gemini_android/lib/python3.12/site-packages/pip/_vendor/pyproject_hooks/_in_process/_in_process.py", line 373, in main
+          json_out["return_val"] = hook(**hook_input["kwargs"])
+                                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        File "/home/ac/miniconda3/envs/gemini_android/lib/python3.12/site-packages/pip/_vendor/pyproject_hooks/_in_process/_in_process.py", line 143, in get_requires_for_build_wheel
+          return hook(config_settings)
+                 ^^^^^^^^^^^^^^^^^^^^^
+        File "/tmp/pip-build-env-juidw6gt/overlay/lib/python3.12/site-packages/setuptools/build_meta.py", line 331, in get_requires_for_build_wheel
+          return self._get_build_requires(config_settings, requirements=[])
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        File "/tmp/pip-build-env-juidw6gt/overlay/lib/python3.12/site-packages/setuptools/build_meta.py", line 301, in _get_build_requires
+          self.run_setup()
+        File "/tmp/pip-build-env-juidw6gt/overlay/lib/python3.12/site-packages/setuptools/build_meta.py", line 512, in run_setup
+          super().run_setup(setup_script=setup_script)
+        File "/tmp/pip-build-env-juidw6gt/overlay/lib/python3.12/site-packages/setuptools/build_meta.py", line 317, in run_setup
+          exec(code, locals())
+        File "<string>", line 157, in <module>
+        File "/tmp/pip-build-env-juidw6gt/overlay/lib/python3.12/site-packages/Cython/Build/Dependencies.py", line 1153, in cythonize
+          cythonize_one(*args)
+        File "/tmp/pip-build-env-juidw6gt/overlay/lib/python3.12/site-packages/Cython/Build/Dependencies.py", line 1297, in cythonize_one
+          raise CompileError(None, pyx_file)
+      Cython.Compiler.Errors.CompileError: av/logging.pyx
+      [end of output]
+  
+  note: This error originates from a subprocess, and is likely not a problem with pip.
+ERROR: Failed to build 'av' when getting requirements to build wheel

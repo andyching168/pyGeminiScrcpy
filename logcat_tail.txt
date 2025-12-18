@@ -1,0 +1,202 @@
+--------- beginning of system
+12-17 22:37:37.559  5250  5250 D MiuiDaemonScenarioSharedMemory: offset: 4436 time: 677903066 scenario: 35653632
+12-17 22:37:37.559  5250  5250 D MiuiDaemonScenarioSharedMemory: offset: 4452 time: 677903812 scenario: 35653918
+12-17 22:37:37.559  5250  5250 D MiuiDaemonScenarioSharedMemory: offset: 4468 time: 677903955 scenario: 35653919
+12-17 22:37:37.559  5250  5250 D MiuiDaemonScenarioSharedMemory: offset: 4484 time: 677903957 scenario: 35653632
+12-17 22:37:37.559  5250  5250 D MiuiDaemonScenarioSharedMemory: offset: 4500 time: 677933337 scenario: 169871360
+12-17 22:37:37.559  5250  5250 D MiuiDaemonScenarioSharedMemory: offset: 4516 time: 677933337 scenario: 169871360
+12-17 22:37:37.559  5250  5250 D MiuiDaemonScenarioSharedMemory: offset: 4532 time: 677993334 scenario: 169871650
+12-17 22:37:37.559  5250  5250 D MiuiDaemonScenarioSharedMemory: offset: 4548 time: 677993983 scenario: 169871360
+12-17 22:37:37.559  5250  5250 D MiuiDaemonScenarioSharedMemory: offset: 4564 time: 678000266 scenario: 169871644
+12-17 22:37:37.559  5250  5250 D MiuiDaemonScenarioSharedMemory: offset: 4580 time: 678000455 scenario: 169871645
+12-17 22:37:37.559  5250  5250 D MiuiDaemonScenarioSharedMemory: offset: 4596 time: 678000459 scenario: 169871360
+12-17 22:37:37.559  5250  5250 D MiuiDaemonScenarioSharedMemory: offset: 4612 time: 678000496 scenario: 169871649
+12-17 22:37:37.559  5250  5250 D MiuiDaemonScenarioSharedMemory: offset: 4628 time: 678000517 scenario: 169871360
+12-17 22:37:37.559  5250  5250 D MiuiDaemonScenarioSharedMemory: offset: 4644 time: 678030873 scenario: 169871873
+12-17 22:37:37.559  5250  5250 D MiuiDaemonScenarioSharedMemory: offset: 4660 time: 678030983 scenario: 169871360
+12-17 22:37:37.559  5250  5250 D MiuiDaemonScenarioSharedMemory: offset: 4676 time: 678130780 scenario: 169871632
+12-17 22:37:37.559  5250  5250 D MiuiDaemonScenarioSharedMemory: offset: 4692 time: 678131354 scenario: 169871360
+12-17 22:37:37.559  5250  5250 D MiuiDaemonScenarioSharedMemory: offset: 4708 time: 678132776 scenario: 169871634
+12-17 22:37:37.559  5250  5250 D MiuiDaemonScenarioSharedMemory: offset: 4724 time: 678132958 scenario: 169871360
+12-17 22:37:37.559  5250  5250 D MiuiDaemonScenarioSharedMemory: offset: 4740 time: 678132966 scenario: 169871634
+12-17 22:37:37.559  5250  5250 D MiuiDaemonScenarioSharedMemory: offset: 4756 time: 678133016 scenario: 169871360
+12-17 22:37:37.559  5250  5250 D MiuiDaemonScenarioSharedMemory: offset: 4772 time: 678133057 scenario: 169871634
+12-17 22:37:37.559  5250  5250 D MiuiDaemonScenarioSharedMemory: offset: 4788 time: 678133065 scenario: 169871360
+12-17 22:37:37.559  5250  5250 D MiuiDaemonScenarioSharedMemory: offset: 4804 time: 678133731 scenario: 169871636
+12-17 22:37:37.559  5250  5250 D MiuiDaemonScenarioSharedMemory: offset: 4820 time: 678133937 scenario: 169871360
+12-17 22:37:37.559  5250  5250 D MiuiDaemonScenarioSharedMemory: offset: 4836 time: 678133937 scenario: 169871636
+12-17 22:37:37.559  5250  5250 D MiuiDaemonScenarioSharedMemory: offset: 4852 time: 678134029 scenario: 169871360
+12-17 22:37:37.559  5250  5250 D MiuiDaemonScenarioSharedMemory: offset: 4868 time: 678464797 scenario: 169871873
+12-17 22:37:37.559  5250  5250 D MiuiDaemonScenarioSharedMemory: offset: 4884 time: 678465139 scenario: 169871360
+12-17 22:37:37.559  5250  5250 D MiuiDaemonScenarioSharedMemory: offset: 4900 time: 678561694 scenario: 169871650
+12-17 22:37:37.559  5250  5250 D MiuiDaemonScenarioSharedMemory: offset: 4916 time: 678562394 scenario: 169871360
+12-17 22:37:37.559  5250  5250 D MiuiDaemonScenarioSharedMemory: offset: 4932 time: 678583970 scenario: 169871649
+12-17 22:37:37.559  5250  5250 D MiuiDaemonScenarioSharedMemory: offset: 4948 time: 678584184 scenario: 169871360
+12-17 22:37:37.559  5250  5250 D MiuiDaemonScenarioSharedMemory: offset: 4964 time: 678645321 scenario: 169871873
+12-17 22:37:37.559  5250  5250 D MiuiDaemonScenarioSharedMemory: offset: 4980 time: 678645507 scenario: 169871360
+12-17 22:37:37.559  5250  5250 D MiuiDaemonScenarioSharedMemory: offset: 4996 time: 678652260 scenario: 169871638
+12-17 22:37:37.559  5250  5250 D MiuiDaemonScenarioSharedMemory: offset: 5012 time: 678652571 scenario: 169871360
+12-17 22:37:37.559  5250  5250 D MiuiDaemonScenarioSharedMemory: offset: 5028 time: 678655337 scenario: 169871873
+12-17 22:37:37.559  5250  5250 D MiuiDaemonScenarioSharedMemory: offset: 5044 time: 678656105 scenario: 169871360
+12-17 22:37:37.559  5250  5250 D MiuiDaemonScenarioSharedMemory: offset: 5060 time: 678657413 scenario: 169871875
+12-17 22:37:37.559  5250  5250 D MiuiDaemonScenarioSharedMemory: offset: 5076 time: 678657737 scenario: 169871360
+12-17 22:37:37.559  5250  5250 D MiuiDaemonScenarioSharedMemory: offset: 5092 time: 678659684 scenario: 169871875
+12-17 22:37:37.559  5250  5250 D MiuiDaemonScenarioSharedMemory: offset: 5108 time: 678660327 scenario: 169871360
+12-17 22:37:37.559  5250  5250 D MiuiDaemonScenarioSharedMemory: offset: 5124 time: 678692984 scenario: 169871638
+12-17 22:37:37.559  5250  5250 D MiuiDaemonScenarioSharedMemory: offset: 5140 time: 678694318 scenario: 169871360
+12-17 22:37:37.559  5250  5250 D MiuiDaemonScenarioSharedMemory: offset: 5156 time: 678715078 scenario: 169871873
+12-17 22:37:37.559  5250  5250 D MiuiDaemonScenarioSharedMemory: offset: 5172 time: 678715297 scenario: 169871360
+12-17 22:37:37.559  5250  5250 D MiuiDaemonScenarioSharedMemory: offset: 5188 time: 678965673 scenario: 169871873
+12-17 22:37:37.559  5250  5250 D MiuiDaemonScenarioSharedMemory: offset: 5204 time: 678965764 scenario: 169871360
+12-17 22:37:37.559  5250  5250 D MiuiDaemonScenarioSharedMemory: offset: 5220 time: 678979205 scenario: 169871876
+12-17 22:37:37.559  5250  5250 D MiuiDaemonScenarioSharedMemory: offset: 5236 time: 678979211 scenario: 169871360
+12-17 22:37:37.559  5250  5250 D MiuiDaemonScenarioSharedMemory: offset: 5252 time: 678980729 scenario: 169871876
+12-17 22:37:37.559  5250  5250 D MiuiDaemonScenarioSharedMemory: offset: 5268 time: 678982115 scenario: 169871360
+12-17 22:37:37.559  5250  5250 D MiuiDaemonScenarioSharedMemory: offset: 5284 time: 678982327 scenario: 169871876
+12-17 22:37:37.559  5250  5250 D MiuiDaemonScenarioSharedMemory: offset: 5300 time: 678982376 scenario: 169871360
+12-17 22:37:37.559  5250  5250 D MiuiDaemonScenarioSharedMemory: offset: 5316 time: 678984237 scenario: 169871876
+12-17 22:37:37.559  5250  5250 D MiuiDaemonScenarioSharedMemory: offset: 5332 time: 678984598 scenario: 169871360
+12-17 22:37:37.559  5250  5250 D MiuiDaemonScenarioSharedMemory: offset: 5348 time: 678985837 scenario: 169871876
+12-17 22:37:37.559  5250  5250 D MiuiDaemonScenarioSharedMemory: offset: 5364 time: 678986588 scenario: 169871360
+12-17 22:37:37.559  5250  5250 D MiuiDaemonScenarioSharedMemory: offset: 5380 time: 678986991 scenario: 169871876
+12-17 22:37:37.559  5250  5250 D MiuiDaemonScenarioSharedMemory: offset: 5396 time: 678987634 scenario: 169871360
+12-17 22:37:37.559  5250  5250 D MiuiDaemonScenarioSharedMemory: offset: 5412 time: 679013360 scenario: 169871876
+12-17 22:37:37.559  5250  5250 D MiuiDaemonScenarioSharedMemory: offset: 5428 time: 679014072 scenario: 169871360
+12-17 22:37:37.559  5250  5250 D MiuiDaemonScenarioSharedMemory: offset: 5444 time: 679014145 scenario: 169871876
+12-17 22:37:37.559  5250  5250 D MiuiDaemonScenarioSharedMemory: offset: 5460 time: 679014968 scenario: 169871360
+12-17 22:37:37.559  5250  5250 D MiuiDaemonScenarioSharedMemory: offset: 5476 time: 679015031 scenario: 169871876
+12-17 22:37:37.559  5250  5250 D MiuiDaemonScenarioSharedMemory: offset: 5492 time: 679015040 scenario: 169871360
+12-17 22:37:37.559  5250  5250 D MiuiDaemonScenarioSharedMemory: offset: 5508 time: 679290868 scenario: 169871650
+12-17 22:37:37.559  5250  5250 D MiuiDaemonScenarioSharedMemory: offset: 5524 time: 679291532 scenario: 169871360
+12-17 22:37:37.559  5250  5250 D MiuiDaemonScenarioSharedMemory: offset: 5540 time: 679762083 scenario: 169871649
+12-17 22:37:37.559  5250  5250 D MiuiDaemonScenarioSharedMemory: offset: 5556 time: 679762282 scenario: 169871646
+12-17 22:37:37.559  5250  5250 D MiuiDaemonScenarioSharedMemory: offset: 5572 time: 679762297 scenario: 169871360
+12-17 22:37:37.559  5250  5250 D MiuiDaemonScenarioSharedMemory: offset: 5588 time: 679762441 scenario: 169871647
+12-17 22:37:37.559  5250  5250 D MiuiDaemonScenarioSharedMemory: offset: 5604 time: 679762442 scenario: 169871360
+12-17 22:37:37.559  5250  5250 D MiuiDaemonScenarioSharedMemory: offset: 5620 time: 679764646 scenario: 169871873
+12-17 22:37:37.559  5250  5250 D MiuiDaemonScenarioSharedMemory: offset: 5636 time: 679764722 scenario: 169871360
+12-17 22:37:37.560  5250  5250 D MiuiDaemonScenarioSharedMemory: offset: 5652 time: 679768734 scenario: 169871876
+12-17 22:37:37.560  5250  5250 D MiuiDaemonScenarioSharedMemory: offset: 5668 time: 679768736 scenario: 169871360
+12-17 22:37:37.560  5250  5250 D MiuiDaemonScenarioSharedMemory: offset: 5684 time: 679771229 scenario: 169871876
+12-17 22:37:37.560  5250  5250 D MiuiDaemonScenarioSharedMemory: offset: 5700 time: 679771373 scenario: 169871360
+12-17 22:37:37.560  5250  5250 D MiuiDaemonScenarioSharedMemory: offset: 5716 time: 679791870 scenario: 169871876
+12-17 22:37:37.560  5250  5250 D MiuiDaemonScenarioSharedMemory: offset: 5732 time: 679792190 scenario: 169871360
+12-17 22:37:37.560  5250  5250 D MiuiDaemonScenarioSharedMemory: offset: 5748 time: 679793400 scenario: 169871876
+12-17 22:37:37.560  5250  5250 D MiuiDaemonScenarioSharedMemory: offset: 5764 time: 679793585 scenario: 169871360
+12-17 22:37:37.560  5250  5250 D MiuiDaemonScenarioSharedMemory: offset: 5780 time: 679794180 scenario: 169871876
+12-17 22:37:37.560  5250  5250 D MiuiDaemonScenarioSharedMemory: offset: 5796 time: 679794181 scenario: 169871360
+12-17 22:37:37.560  5250  5250 D MiuiDaemonScenarioSharedMemory: offset: 5812 time: 679806566 scenario: 169871873
+12-17 22:37:37.560  5250  5250 D MiuiDaemonScenarioSharedMemory: offset: 5828 time: 679806769 scenario: 169871875
+12-17 22:37:37.560  5250  5250 D MiuiDaemonScenarioSharedMemory: offset: 5844 time: 679806990 scenario: 169871360
+12-17 22:37:37.560  5250  5250 D MiuiDaemonScenarioSharedMemory: offset: 5860 time: 679808478 scenario: 169871875
+12-17 22:37:37.560  5250  5250 D MiuiDaemonScenarioSharedMemory: offset: 5876 time: 679808852 scenario: 169871360
+12-17 22:37:37.560  5250  5250 D MiuiDaemonScenarioSharedMemory: offset: 5892 time: 679818773 scenario: 169871650
+12-17 22:37:37.560  5250  5250 D MiuiDaemonScenarioSharedMemory: offset: 5908 time: 679819373 scenario: 169871360
+12-17 22:37:37.560  5250  5250 D MiuiDaemonScenarioSharedMemory: offset: 5924 time: 679819378 scenario: 169871649
+12-17 22:37:37.560  5250  5250 D MiuiDaemonScenarioSharedMemory: offset: 5940 time: 679819654 scenario: 169871360
+12-17 22:37:37.560  5250  5250 D MiuiDaemonScenarioSharedMemory: offset: 5956 time: 679832058 scenario: 169871650
+12-17 22:37:37.560  5250  5250 D MiuiDaemonScenarioSharedMemory: offset: 5972 time: 679832725 scenario: 169871360
+12-17 22:37:37.560  5250  5250 D MiuiDaemonScenarioSharedMemory: offset: 5988 time: 679919730 scenario: 169871649
+12-17 22:37:37.560  5250  5250 D MiuiDaemonScenarioSharedMemory: offset: 6004 time: 679919949 scenario: 169871360
+12-17 22:37:37.560  5250  5250 D MiuiDaemonScenarioSharedMemory: offset: 6020 time: 680093658 scenario: 169871873
+12-17 22:37:37.560  5250  5250 D MiuiDaemonScenarioSharedMemory: offset: 6036 time: 680093971 scenario: 169871360
+12-17 22:37:37.560  5250  5250 D MiuiDaemonScenarioSharedMemory: offset: 6052 time: 680094621 scenario: 236980224
+12-17 22:37:37.560  5250  5250 D MiuiDaemonScenarioSharedMemory: offset: 6068 time: 680094621 scenario: 236980224
+12-17 22:37:37.560  5250  5250 D MiuiDaemonScenarioSharedMemory: offset: 6084 time: 680095345 scenario: 169871360
+12-17 22:37:37.560  5250  5250 D MiuiDaemonScenarioSharedMemory: offset: 6100 time: 680095345 scenario: 169871360
+12-17 22:37:37.560  5250  5250 D MiuiDaemonScenarioSharedMemory: offset: 6116 time: 680095792 scenario: 169871873
+12-17 22:37:37.560  5250  5250 D MiuiDaemonScenarioSharedMemory: offset: 6132 time: 680095957 scenario: 169871360
+12-17 22:37:37.560  5250  5250 D MiuiDaemonScenarioSharedMemory: offset: 6148 time: 681426269 scenario: 169871650
+12-17 22:37:37.560  5250  5250 D MiuiDaemonScenarioSharedMemory: offset: 6164 time: 681426959 scenario: 169871360
+12-17 22:37:37.560  5250  5250 D MiuiDaemonScenarioSharedMemory: offset: 6180 time: 681488238 scenario: 169871644
+12-17 22:37:37.560  5250  5250 D MiuiDaemonScenarioSharedMemory: offset: 6196 time: 681488586 scenario: 169871645
+12-17 22:37:37.560  5250  5250 D MiuiDaemonScenarioSharedMemory: offset: 6212 time: 681488590 scenario: 169871649
+12-17 22:37:37.560  5250  5250 D MiuiDaemonScenarioSharedMemory: offset: 6228 time: 681488592 scenario: 169871360
+12-17 22:37:37.560  5250  5250 D MiuiDaemonScenarioSharedMemory: offset: 6244 time: 681594961 scenario: 169871650
+12-17 22:37:37.560  5250  5250 D MiuiDaemonScenarioSharedMemory: offset: 6260 time: 681595617 scenario: 169871360
+12-17 22:37:37.560  5250  5250 D MiuiDaemonScenarioSharedMemory: offset: 6276 time: 681597098 scenario: 169871649
+12-17 22:37:37.560  5250  5250 D MiuiDaemonScenarioSharedMemory: offset: 6292 time: 681597168 scenario: 169871360
+12-17 22:37:37.560  5250  5250 D MiuiDaemonScenarioSharedMemory: offset: 6308 time: 682020955 scenario: 169871650
+12-17 22:37:37.560  5250  5250 D MiuiDaemonScenarioSharedMemory: offset: 6324 time: 682021671 scenario: 169871360
+12-17 22:37:37.560  5250  5250 D MiuiDaemonScenarioSharedMemory: offset: 6340 time: 682285097 scenario: 169871644
+12-17 22:37:37.560  5250  5250 D MiuiDaemonScenarioSharedMemory: offset: 6356 time: 682285430 scenario: 169871645
+12-17 22:37:37.560  5250  5250 D MiuiDaemonScenarioSharedMemory: offset: 6372 time: 682285435 scenario: 169871360
+12-17 22:37:37.560  5250  5250 D MiuiDaemonScenarioSharedMemory: offset: 6388 time: 682285457 scenario: 169871649
+12-17 22:37:37.560  5250  5250 D MiuiDaemonScenarioSharedMemory: offset: 6404 time: 682285500 scenario: 169871360
+12-17 22:37:37.560  5250  5250 D MiuiDaemonScenarioSharedMemory: offset: 6420 time: 682405495 scenario: 169871650
+12-17 22:37:37.560  5250  5250 D MiuiDaemonScenarioSharedMemory: offset: 6436 time: 682406147 scenario: 169871360
+12-17 22:37:37.560  5250  5250 D MiuiDaemonScenarioSharedMemory: offset: 6452 time: 682455415 scenario: 169871644
+12-17 22:37:37.560  5250  5250 D MiuiDaemonScenarioSharedMemory: offset: 6468 time: 682455756 scenario: 169871645
+12-17 22:37:37.560  5250  5250 D MiuiDaemonScenarioSharedMemory: offset: 6484 time: 682455760 scenario: 169871360
+12-17 22:37:37.560  5250  5250 D MiuiDaemonScenarioSharedMemory: offset: 6500 time: 682455784 scenario: 169871649
+12-17 22:37:37.560  5250  5250 D MiuiDaemonScenarioSharedMemory: offset: 6516 time: 682455836 scenario: 169871360
+12-17 22:37:37.560  5250  5250 D MiuiDaemonScenarioSharedMemory: offset: 6532 time: 682515993 scenario: 169871650
+12-17 22:37:37.560  5250  5250 D MiuiDaemonScenarioSharedMemory: offset: 6548 time: 682516650 scenario: 169871360
+12-17 22:37:37.560  5250  5250 D MiuiDaemonScenarioSharedMemory: offset: 6564 time: 682535846 scenario: 169871644
+12-17 22:37:37.560  5250  5250 D MiuiDaemonScenarioSharedMemory: offset: 6580 time: 682536221 scenario: 169871645
+12-17 22:37:37.560  5250  5250 D MiuiDaemonScenarioSharedMemory: offset: 6596 time: 682536226 scenario: 169871360
+12-17 22:37:37.560  5250  5250 D MiuiDaemonScenarioSharedMemory: offset: 6612 time: 682536227 scenario: 169871649
+12-17 22:37:37.560  5250  5250 D MiuiDaemonScenarioSharedMemory: offset: 6628 time: 682536228 scenario: 169871360
+12-17 22:37:37.560  5250  5250 D MiuiDaemonScenarioSharedMemory: offset: 6644 time: 682596442 scenario: 169871650
+12-17 22:37:37.560  5250  5250 D MiuiDaemonScenarioSharedMemory: offset: 6660 time: 682597127 scenario: 169871360
+12-17 22:37:37.754  3274  3274 D ArtChoreographerMonitor: invoke error.
+--------- beginning of main
+12-17 22:37:37.757  3274  3274 D ControlCenterHeaderExpandController: onExpansionChanged: progress =  0.0
+12-17 22:37:37.758  3274  3274 D ControlCenterHeaderExpandController: onExpansionChanged: progress =  0.0
+12-17 22:37:37.771  3274  3274 D ControlCenterHeaderExpandController: onExpansionChanged: progress =  0.0
+12-17 22:37:37.938  3274  3274 D ArtChoreographerMonitor: invoke error.
+12-17 22:37:37.991  1871  2378 D ULogGuard: Monitoring: 32 threads, 0 requests, 0 time-bombs; 34 guards. ResetFlags = 0x7
+12-17 22:37:38.159  1797  2206 D connsyslogger: idx=0 Bootup Log: 2 log files! filecount=3 
+12-17 22:37:38.161  1797  2208 I connsyslogger: thrLogWriter: LogBuf=248.078125KB,idx=0
+12-17 22:37:38.326  1305  1360 E HfLooper: sensor type is 4 action is 2 data is -439.000000 303.000000 -1414.000000
+12-17 22:37:38.327  1305  1360 W AString : ctor got NULL, using empty string instead
+12-17 22:37:38.327  1305  1360 I SensorSavedChannel: [-439,303,-1414]==>gyro_bias.json
+12-17 22:37:38.327  1305  1360 I SensorSavedChannel: Scp reboot count = 112414, reboot_flag = 0
+12-17 22:37:38.499 19400 24165 D AudioTrack: [audioTrackData][zero] 11s(f:52100 m:0 s:0 k:0 z:11003) : pid 19400 uid 10307 sessionId 30809 sr 48000 ch 2 fmt 1  mMaxAmplitude 0
+12-17 22:37:38.735  1709  2632 I whetstone.activity: Power Event callback listener is empty for resId=128
+12-17 22:37:38.736  1709  2632 D BatteryStatsManagerStub: notifyEvent for resId=128 used 1ms
+12-17 22:37:38.743  1709  3431 D Aurogon :  packageName = com.google.android.gms isAllowWakeUpList 
+12-17 22:37:38.745 15853 15906 W Settings: Setting airplane_mode_on has moved from android.provider.Settings.System to android.provider.Settings.Global, returning read-only value.
+12-17 22:37:38.748  1709  3431 D Aurogon :  packageName = com.google.android.gms isAllowWakeUpList 
+12-17 22:37:38.752 15853  7164 W SystemServiceRegistry: No service published for: wifirtt
+12-17 22:37:38.867  5220  5220 I wpa_supplicant: assoc key_mgmt 0x4000000 network key_mgmt 0x4000542
+12-17 22:37:38.872  5220  5220 I wpa_supplicant: MLO: AA[a6:ad:9f:47:57:c5] use ml addr[06:ad:9f:47:57:c4]
+12-17 22:37:38.872  5220  5220 I wpa_supplicant: wlan0: MLO RSN: Group rekeying completed with 06:ad:9f:47:57:c4 [GTK=CCMP]
+12-17 22:37:38.872  5220  5220 I wpa_supplicant: assoc key_mgmt 0x4000000 network key_mgmt 0x4000542
+12-17 22:37:38.875  1709  2741 D MiuiWifiStateMachine: enter L2ConnectedState
+12-17 22:37:38.875  1709  2734 I WifiClientModeImpl[646977087:wlan0]: Update current security type to 4
+12-17 22:37:38.878  1709  2734 I WifiClientModeImpl[646977087:wlan0]: Update current security type to 4 from network connection event.
+12-17 22:37:38.881  5220  5220 I wpa_supplicant: wpa_driver_nl80211_driver_cmd: wlan0 recv cmd MACADDR
+12-17 22:37:38.882  1709  2734 I ApplicationQosPolicyRequestHandler: Queueing all policies on iface=wlan0. numPolicies=0
+12-17 22:37:38.883  1709  2734 I ApplicationQosPolicyRequestHandler: 0 policies contain QosCharacteristics
+12-17 22:37:38.888  1709  2734 I WifiClientModeImpl[646977087:wlan0]: Update current security type to 4
+12-17 22:37:38.891  1709  3138 I NetworkBoostStatusManager: handle: 102
+12-17 22:37:38.892  1709  3138 I NetworkBoostStatusManager: interfaceOnCapabilitiesChanged interface name:wlan0
+12-17 22:37:38.894  8581  8736 W Settings: Setting device_provisioned has moved from android.provider.Settings.Secure to android.provider.Settings.Global.
+12-17 22:37:38.895  8581  8736 I JoyoseCloudControlManager3: network metered changed, network metered: false, deviceProvisioned: true, scAllowConn: true, try to setNetworkAccessEnabled: true
+12-17 22:37:38.895  6710  6847 I NetBusNetworkMonitor: onCapabilitiesChanged isPrimary = true
+12-17 22:37:38.896  6710  6847 I NetBusNetworkMonitor: gateway=192.*.*.1
+12-17 22:37:38.900 20415 20520 D TopOnAdsLog: onCapabilitiesChanged 0
+12-17 22:37:38.900 20415 20520 D TopOnAdsLog: ----initCustomData---- hasHuawei=1, hasMtg=1 : {isRadical=0, hasShareitSplash=1, hasMtg=1, hasShareit=1, hasHuawei13468=1, hasHuawei=1, hasMTGBidding=1, hasBannerIAD=1, isPlugin=1, hasBigo=1, hasVungleNative=1, hasUnity=1, use_vpn=0, hasMax=1, hasPangleNew=1, hasOnline=1, hasInmobi=1, model=2407FPN8EG, hasVungle=1, hasPubnative=1, hasTopOn=1, hasShareitBanner=1, hasYandex=1}
+12-17 22:37:38.902  6710  6847 I NetBusNetworkMonitor: addConnectNetworkInterface mediumType:256, detail:NetworkDetailInfo{mIsConnected=false, mIsSupportTdls=true, mNetworkType=0, mIpAddress=192.*.*.189, mIfName=wlan0, mGateway=192.*.*.1, mNetmask=255.*.*.0, mSsid=C**sh}
+12-17 22:37:38.903  6710  6847 I NetBusNetworkMonitor: onCapabilitiesChanged handle=1927551045645, mediumType=256, ifName=wlan0
+12-17 22:37:38.910  6710  6847 I NetBusNetworkMonitor: onCapabilitiesChanged isPrimary = true
+12-17 22:37:38.910  6710  6847 I NetBusNetworkMonitor: gateway=192.*.*.1
+12-17 22:37:38.911  1709  3138 I NetworkBoostStatusManager: handle: 102
+12-17 22:37:38.911  1709  3138 I NetworkBoostStatusManager: interfaceOnCapabilitiesChanged interface name:wlan0
+12-17 22:37:38.914  6710  6847 I NetBusNetworkMonitor: addConnectNetworkInterface mediumType:256, detail:NetworkDetailInfo{mIsConnected=false, mIsSupportTdls=true, mNetworkType=0, mIpAddress=192.*.*.189, mIfName=wlan0, mGateway=192.*.*.1, mNetmask=255.*.*.0, mSsid=C**sh}
+12-17 22:37:38.914  6710  6847 I NetBusNetworkMonitor: onCapabilitiesChanged handle=1927551045645, mediumType=256, ifName=wlan0
+12-17 22:37:38.914  8581  8736 W Settings: Setting device_provisioned has moved from android.provider.Settings.Secure to android.provider.Settings.Global.
+12-17 22:37:38.914  8581  8736 I JoyoseCloudControlManager3: network metered changed, network metered: false, deviceProvisioned: true, scAllowConn: true, try to setNetworkAccessEnabled: true
+12-17 22:37:38.915 20415 20520 D TopOnAdsLog: onCapabilitiesChanged 0
+12-17 22:37:38.916 20415 20520 D TopOnAdsLog: ----initCustomData---- hasHuawei=1, hasMtg=1 : {isRadical=0, hasShareitSplash=1, hasMtg=1, hasShareit=1, hasHuawei13468=1, hasHuawei=1, hasMTGBidding=1, hasBannerIAD=1, isPlugin=1, hasBigo=1, hasVungleNative=1, hasUnity=1, use_vpn=0, hasMax=1, hasPangleNew=1, hasOnline=1, hasInmobi=1, model=2407FPN8EG, hasVungle=1, hasPubnative=1, hasTopOn=1, hasShareitBanner=1, hasYandex=1}
+12-17 22:37:38.916  2869  2871 D WifiHAL : WifiRequest::create vendor command to iface 37, vendor_id=0xce7, subcmd=0x0052, res=0
+12-17 22:37:38.917  2869  2871 D WifiHAL : WifiRequest::create vendor command to iface 37, vendor_id=0xce7, subcmd=0x0052, res=0
+12-17 22:37:38.917 14562 14663 I NearbyMediums: [DeviceCapabilities] Skip refreshing cached wifi channels because it is not supported (refreshCacheWifiChannelsRightAfterNetworkCallbackInvoked:false isWifiGetUsableChannelsSupported:true)
+12-17 22:37:38.919 15853  7161 I NearbyMediums: [DeviceCapabilities] Skip refreshing cached wifi channels because it is not supported (refreshCacheWifiChannelsRightAfterNetworkCallbackInvoked:false isWifiGetUsableChannelsSupported:true)
+12-17 22:37:39.017  1347  1367 D power@timer: [mtkPowerTimer] visRead:0
+12-17 22:37:39.238  1709  3428 D ActivityManager: getProcessesInErrorState callingUid=10596, CallingPid=6776
+12-17 22:37:39.262  1797  2205 D connsyslogger: SD_LOG_ROOT is /data/debuglogger/connsyslog/fw.
+12-17 22:37:39.262  1797  2205 D connsyslogger: systemReady:1
+12-17 22:37:39.426 15853  7161 I NearbySharing: Network state changed: NetworkState(isRestricted=false, isOnline=true, isCongested=false, isMetered=false, isWifiConnected=true)
+12-17 22:37:39.496 19400 24165 D AudioTrack: [audioTrackData][zero] 12s(f:52100 m:0 s:0 k:0 z:12000) : pid 19400 uid 10307 sessionId 30809 sr 48000 ch 2 fmt 1  mMaxAmplitude 0

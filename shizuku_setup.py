@@ -186,14 +186,58 @@ class ShizukuShell:
             timeout=timeout
         )
     
-    def screenshot(self, output_path: str = "/tmp/screen.png") -> Optional[str]:
+    def screenshot(self, output_path: str = None) -> Optional[str]:
         """Capture screenshot using Shizuku shell."""
+        # Use Termux home directory if no path specified
+        if output_path is None:
+            output_path = os.path.join(TERMUX_HOME, "screen.png")
+        
         try:
-            result = self.run_raw("screencap -p", timeout=10)
-            if result.returncode == 0 and result.stdout:
+            # Method 1: Direct stdout capture (preferred)
+            result = self.run_raw("screencap -p", timeout=15)
+            if result.returncode == 0 and result.stdout and len(result.stdout) > 100:
                 with open(output_path, 'wb') as f:
                     f.write(result.stdout)
                 return output_path
+            
+            # Method 2: Save to shared storage then copy
+            temp_path = "/data/local/tmp/shizuku_screen.png"
+            code, stdout, stderr = self.run(f"screencap -p {temp_path}", timeout=15)
+            if code == 0:
+                # Read the file back
+                result = self.run_raw(f"cat {temp_path}", timeout=10)
+                if result.returncode == 0 and result.stdout:
+                    with open(output_path, 'wb') as f:
+                        f.write(result.stdout)
+                    # Clean up
+                    self.run(f"rm {temp_path}")
+                    return output_path
+            
+            # If we get here, something went wrong
+            if result.stderr:
+                print(f"Screenshot error: {result.stderr.decode() if isinstance(result.stderr, bytes) else result.stderr}")
+            return None
+            
+        except Exception as e:
+            print(f"Screenshot failed: {e}")
+            return None
+    
+    def screenshot_bytes(self) -> Optional[bytes]:
+        """Capture screenshot and return as bytes (for direct use)."""
+        try:
+            result = self.run_raw("screencap -p", timeout=15)
+            if result.returncode == 0 and result.stdout and len(result.stdout) > 100:
+                return result.stdout
+            
+            # Fallback: save to temp file then read
+            temp_path = "/data/local/tmp/shizuku_screen.png"
+            code, _, _ = self.run(f"screencap -p {temp_path}", timeout=15)
+            if code == 0:
+                result = self.run_raw(f"cat {temp_path}", timeout=10)
+                self.run(f"rm {temp_path}")
+                if result.returncode == 0 and result.stdout:
+                    return result.stdout
+            
             return None
         except Exception as e:
             print(f"Screenshot failed: {e}")
@@ -322,23 +366,81 @@ def run_test():
     
     if not shell.available:
         print("❌ rish not available")
+        print("   Run: python shizuku_setup.py install")
         return
     
-    print("Running: echo 'Hello from Shizuku!'")
-    code, stdout, stderr = shell.run("echo 'Hello from Shizuku!'")
+    print(f"📍 rish path: {shell.rish_path}")
     
-    if code == 0:
-        print(f"✓ Output: {stdout.strip()}")
-        
-        # Test screenshot
-        print("\nTesting screenshot...")
-        path = shell.screenshot("/tmp/shizuku_test.png")
-        if path:
-            print(f"✓ Screenshot saved to: {path}")
+    # Test 1: Basic echo (multiple attempts)
+    print("\n1️⃣ Testing basic echo command...")
+    success_count = 0
+    for i in range(3):
+        code, stdout, stderr = shell.run("echo 'test'")
+        if code == 0 and "test" in stdout:
+            success_count += 1
         else:
-            print("❌ Screenshot failed")
+            print(f"   Attempt {i+1} failed: code={code}, stderr={stderr}")
+    
+    if success_count == 3:
+        print(f"   ✓ Echo test: {success_count}/3 passed")
     else:
-        print(f"❌ Failed: {stderr}")
+        print(f"   ⚠️ Echo test: {success_count}/3 passed (unstable)")
+    
+    # Test 2: Get ID
+    print("\n2️⃣ Testing shell identity...")
+    code, stdout, stderr = shell.run("id")
+    if code == 0:
+        print(f"   ✓ ID: {stdout.strip()[:60]}...")
+    else:
+        print(f"   ❌ Failed: {stderr}")
+    
+    # Test 3: Screen size
+    print("\n3️⃣ Testing screen size...")
+    size = shell.get_screen_size()
+    if size:
+        print(f"   ✓ Screen: {size[0]}x{size[1]}")
+    else:
+        print("   ❌ Failed to get screen size")
+    
+    # Test 4: Screenshot (direct bytes)
+    print("\n4️⃣ Testing screenshot (direct)...")
+    png_bytes = shell.screenshot_bytes()
+    if png_bytes and len(png_bytes) > 1000:
+        print(f"   ✓ Got {len(png_bytes)} bytes")
+        # Save to Termux home
+        output_path = os.path.expanduser("~/shizuku_test.png")
+        with open(output_path, 'wb') as f:
+            f.write(png_bytes)
+        print(f"   ✓ Saved to: {output_path}")
+    else:
+        print("   ❌ Direct screenshot failed, trying file method...")
+        
+        # Try file-based method
+        temp_path = "/data/local/tmp/test_screen.png"
+        code, stdout, stderr = shell.run(f"screencap -p {temp_path}")
+        print(f"   File save result: code={code}, stderr={stderr}")
+        
+        if code == 0:
+            # Try to read it back
+            result = shell.run_raw(f"cat {temp_path}")
+            if result.returncode == 0 and result.stdout:
+                print(f"   ✓ Got {len(result.stdout)} bytes via file")
+                output_path = os.path.expanduser("~/shizuku_test.png")
+                with open(output_path, 'wb') as f:
+                    f.write(result.stdout)
+                print(f"   ✓ Saved to: {output_path}")
+            else:
+                print(f"   ❌ Can't read temp file")
+        else:
+            print("   ❌ Screenshot permission denied")
+            print("\n💡 This might be a Shizuku permission issue.")
+            print("   Try restarting Shizuku service in the app.")
+    
+    print("\n" + "=" * 50)
+    if success_count >= 2:
+        print("✅ Shizuku is working! Use: python agent.py --shizuku --streaming")
+    else:
+        print("⚠️ Shizuku has issues. Check the errors above.")
 
 
 def main():

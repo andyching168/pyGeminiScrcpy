@@ -462,7 +462,20 @@ class GeminiAgent:
                     else:
                         return result.stdout
             except Exception as e:
-                print(f"Shizuku screenshot failed: {e}, trying ADB...")
+                print(f"Shizuku screenshot (direct) failed: {e}")
+            
+            # Try screenshot_bytes method as fallback
+            try:
+                png_bytes = self.shizuku_shell.screenshot_bytes()
+                if png_bytes and len(png_bytes) > 100:
+                    if HAS_CV2:
+                        image_data = np.frombuffer(png_bytes, np.uint8)
+                        frame = cv2.imdecode(image_data, cv2.IMREAD_COLOR)
+                        return frame
+                    else:
+                        return png_bytes
+            except Exception as e:
+                print(f"Shizuku screenshot (bytes) failed: {e}, trying ADB...")
         
         # Fall back to ADB
         try:

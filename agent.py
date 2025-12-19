@@ -13,42 +13,142 @@ from google.genai import types
 from google.genai.types import Content, Part
 
 # --- Configuration ---
-# Computer Use 必須使用這個專用模型
-DEFAULT_MODEL = "gemini-2.5-computer-use-preview-10-2025"
+DEFAULT_MODEL = "gemini-3-flash-preview"
 
 # System prompt for Android control
-SYSTEM_PROMPT = """You are operating an Android phone. 
-* To provide an answer to the user, *do not use any tools* and output your answer on a separate line.
-* Make sure you scroll down to see everything before deciding something isn't available.
-* You can open an app from anywhere. The icon doesn't have to currently be on screen.
-* Unless explicitly told otherwise, make sure to save any changes you make.
-* If text is cut off or incomplete, scroll or click into the element to get the full text before providing an answer.
-* IMPORTANT: Complete the given task EXACTLY as stated. DO NOT make any assumptions that completing a similar task is correct. If you can't find what you're looking for, SCROLL to find it.
-* If you want to edit some text, ONLY USE THE `type` tool. Do not use the onscreen keyboard.
-* Quick settings shouldn't be used to change settings. Use the Settings app instead.
-* The given task may already be completed. If so, there is no need to do anything.
+SYSTEM_PROMPT = """You are an AI agent operating an Android device.
+Target Device Screen: {width}x{height} (Pixel coordinates)
 
-Available actions:
-- click_at(x, y): Click at coordinates (0-999 normalized)
-- type(text, press_enter): Type text, optionally press enter
-- scroll(x, y, direction): Scroll up/down/left/right at position
-- wait(seconds): Wait for specified seconds
-- go_back(): Press Android back button
-- go_home(): Press Android home button
+Your goal is to complete the user's request by interacting with the screen.
+
+available tools:
+- click_at(x, y): Click at normalized coordinates (0-1000). (0,0) is top-left, (1000,1000) is bottom-right.
+- type(text, press_enter): Type text. Use this for all text input. Set press_enter=True to submit.
+- scroll(x, y, direction): Scroll in a direction ('up', 'down', 'left', 'right') starting from (x,y).
+- wait(seconds): Wait for a specific amount of time.
+- long_press_at(x, y): Long press at normalized coordinates.
+- go_home(): Press the Home button.
+- go_back(): Press the Back button.
+- open_app(app_name): Open an app by name.
+- launch_package(package_name): Launch an app directly by its package name (e.g., 'com.google.android.apps.maps' for Google Maps). More reliable than open_app.
+
+CRITICAL RULES TO PREVENT HALLUCINATIONS:
+1. Coordinates are NORMALIZED (0-1000). You MUST map your desired screen location to this range.
+2. ALWAYS describe what you SEE in the current screenshot BEFORE taking any action.
+3. NEVER assume UI elements exist if you cannot see them in the screenshot.
+4. NEVER click on coordinates where you cannot verify a button/element exists.
+5. If you don't see what you expect, STOP and SCROLL to find it, or report that you cannot proceed.
+6. If text is cut off, assume there is more content and scroll to reveal it.
+7. DO NOT make up app names, button locations, or UI elements that are not visible.
+8. If the user asks to "open X", try `open_app("X")` first. If that fails or if you need to navigate within an app, use clicks ONLY on visible elements.
+9. To search, find the search bar IN THE SCREENSHOT and click it, then type. Do not assume where it is.
+10. When the task is successfully completed, output ONLY "TASK_FINISHED".
+11. If you are stuck and cannot proceed, output "ERROR_STUCK" with a brief explanation.
+
+WORKFLOW FOR EVERY ACTION:
+Step 1: Describe what you see in the current screenshot
+Step 2: Plan your next action based ONLY on what is visible
+Step 3: Execute the action using available tools
+Step 4: Verify the result in the next screenshot
 """
 
-# Exclude browser-specific predefined functions for Android
-EXCLUDED_PREDEFINED_FUNCTIONS = [
-    "open_web_browser",
-    "search",
-    "navigate",
-    "hover_at",
-    "scroll_document",
-    "go_forward",
-    "key_combination",
-    "drag_and_drop",
-]
-
+def get_tool_definitions():
+    return [
+        types.Tool(
+            function_declarations=[
+                types.FunctionDeclaration(
+                    name="click_at",
+                    description="Click at specific coordinates on the screen.",
+                    parameters=types.Schema(
+                        type=types.Type.OBJECT,
+                        properties={
+                            "x": types.Schema(type=types.Type.INTEGER, description="X coordinate (0-1000)"),
+                            "y": types.Schema(type=types.Type.INTEGER, description="Y coordinate (0-1000)"),
+                        },
+                        required=["x", "y"],
+                    ),
+                ),
+                types.FunctionDeclaration(
+                    name="type",
+                    description="Type text into the focused field.",
+                    parameters=types.Schema(
+                        type=types.Type.OBJECT,
+                        properties={
+                            "text": types.Schema(type=types.Type.STRING, description="The text to type"),
+                            "press_enter": types.Schema(type=types.Type.BOOLEAN, description="Whether to press enter after typing"),
+                        },
+                        required=["text"],
+                    ),
+                ),
+                types.FunctionDeclaration(
+                    name="scroll",
+                    description="Scroll the screen in a specific direction.",
+                    parameters=types.Schema(
+                        type=types.Type.OBJECT,
+                        properties={
+                            "x": types.Schema(type=types.Type.INTEGER, description="X coordinate to start scroll (0-1000)"),
+                            "y": types.Schema(type=types.Type.INTEGER, description="Y coordinate to start scroll (0-1000)"),
+                            "direction": types.Schema(type=types.Type.STRING, description="Direction to scroll (up, down, left, right)"),
+                        },
+                        required=["direction"],
+                    ),
+                ),
+                types.FunctionDeclaration(
+                    name="wait",
+                    description="Wait for a specified number of seconds.",
+                    parameters=types.Schema(
+                        type=types.Type.OBJECT,
+                        properties={
+                            "seconds": types.Schema(type=types.Type.INTEGER, description="Number of seconds to wait"),
+                        },
+                        required=["seconds"],
+                    ),
+                ),
+                types.FunctionDeclaration(
+                    name="long_press_at",
+                    description="Long press at specific coordinates.",
+                    parameters=types.Schema(
+                        type=types.Type.OBJECT,
+                        properties={
+                            "x": types.Schema(type=types.Type.INTEGER, description="X coordinate (0-1000)"),
+                            "y": types.Schema(type=types.Type.INTEGER, description="Y coordinate (0-1000)"),
+                        },
+                        required=["x", "y"],
+                    ),
+                ),
+                types.FunctionDeclaration(
+                    name="go_home",
+                    description="Press the Android Home button.",
+                ),
+                types.FunctionDeclaration(
+                    name="go_back",
+                    description="Press the Android Back button.",
+                ),
+                types.FunctionDeclaration(
+                    name="open_app",
+                    description="Open an app by its name.",
+                    parameters=types.Schema(
+                        type=types.Type.OBJECT,
+                        properties={
+                            "app_name": types.Schema(type=types.Type.STRING, description="Name of the app to open"),
+                        },
+                        required=["app_name"],
+                    ),
+                ),
+                types.FunctionDeclaration(
+                    name="launch_package",
+                    description="Launch an app directly using its package name. More reliable than open_app. Examples: com.google.android.apps.maps for Google Maps, com.android.chrome for Chrome.",
+                    parameters=types.Schema(
+                        type=types.Type.OBJECT,
+                        properties={
+                            "package_name": types.Schema(type=types.Type.STRING, description="Android package name (e.g., com.google.android.apps.maps)"),
+                        },
+                        required=["package_name"],
+                    ),
+                ),
+            ]
+        )
+    ]
 
 class GeminiAgent:
     def __init__(self, api_key, model_name=DEFAULT_MODEL, use_adb_fallback=False):
@@ -59,8 +159,8 @@ class GeminiAgent:
         self.scrcpy_client = None
         self.last_frame = None
         self.frame_lock = threading.Lock()
-        self.width = 0
-        self.height = 0
+        self.width = 1080  # Default, will update
+        self.height = 2400 # Default, will update
         
         # Cache real device screen size (for ADB input coordinates)
         self.real_width = None
@@ -70,16 +170,20 @@ class GeminiAgent:
         self.contents: List[Content] = []
 
     def get_config(self) -> types.GenerateContentConfig:
-        """Build configuration with Computer Use tool for Android."""
+        """Build configuration with generic tools for Android."""
         return types.GenerateContentConfig(
-            system_instruction=SYSTEM_PROMPT,
-            tools=[
-                types.Tool(
-                    computer_use=types.ComputerUse(
-                        environment=types.Environment.ENVIRONMENT_BROWSER,
-                    ),
-                ),
-            ],
+            system_instruction=SYSTEM_PROMPT.format(width=self.width, height=self.height),
+            tools=get_tool_definitions(),
+            # 增加思考配置，讓模型在輸出指令前先「思考」
+            thinking_config=types.ThinkingConfig(
+                include_thoughts=True,
+                # 對於需要高精確座標的任務，建議設為 medium 或 high
+                # 但注意：這會增加 Token 消耗與延遲
+            ),
+            # 降低溫度以減少幻覺，提高準確性
+            temperature=0.0,  # 0.0 = 最確定性，1.0+ = 更有創意但可能幻覺
+            top_p=0.95,       # Nucleus sampling: 只考慮累積機率95%的 tokens
+            top_k=40,         # 只從前40個最可能的 tokens 中選擇
         )
 
     def set_scrcpy_client(self, client):
@@ -271,9 +375,9 @@ class GeminiAgent:
             elif direction == "up":
                 end_y = actual_y - distance
             elif direction == "left":
-                end_x = actual_x + distance
-            else:  # right
                 end_x = actual_x - distance
+            else:  # right
+                end_x = actual_x + distance
             
             # Helper for swipe
             self._scrcpy_swipe_gesture(start_x, start_y, end_x, end_y)
@@ -347,6 +451,38 @@ class GeminiAgent:
         self._adb_shell(["monkey", "-p", app_name, "-c", "android.intent.category.LAUNCHER", "1"])
         return {"status": "app_opened", "app_name": app_name, "url": "android://device"}
 
+    def _execute_launch_package(self, package_name: str):
+        """Launch an app directly by package name using am start."""
+        print(f"ACTION: Launch package '{package_name}'")
+        
+        # Method 1: Use monkey (most reliable for launcher apps)
+        try:
+            result = subprocess.run(
+                ["adb", "shell", "monkey", "-p", package_name, "-c", "android.intent.category.LAUNCHER", "1"],
+                capture_output=True,
+                text=True,
+                timeout=5
+            )
+            if result.returncode == 0 and "Events injected: 1" in result.stdout:
+                print(f"  ✓ Successfully launched via monkey")
+                return {"status": "package_launched", "package_name": package_name, "url": "android://device"}
+        except Exception as e:
+            print(f"  Monkey method failed: {e}")
+        
+        # Method 2: Use am start with MAIN/LAUNCHER intent (doesn't require activity name)
+        try:
+            self._adb_shell([
+                "am", "start",
+                "-a", "android.intent.action.MAIN",
+                "-c", "android.intent.category.LAUNCHER",
+                "-n", package_name
+            ])
+            print(f"  ✓ Launched via am start MAIN/LAUNCHER")
+        except Exception as e:
+            print(f"  am start method failed: {e}")
+        
+        return {"status": "package_launched", "package_name": package_name, "url": "android://device"}
+
     def _execute_open_browser(self):
         """Open Google App search screen (like tapping search bar on home screen)."""
         print("ACTION: Open Google App search")
@@ -416,6 +552,8 @@ class GeminiAgent:
             return self._execute_go_back()
         elif name == "open_app":
             return self._execute_open_app(args.get("app_name", ""))
+        elif name == "launch_package":
+            return self._execute_launch_package(args.get("package_name", ""))
         else:
             print(f"Unknown function: {name}")
             return {"status": "error", "message": f"Unknown function: {name}", "url": "android://device"}
@@ -442,6 +580,115 @@ class GeminiAgent:
         png_bytes = buffer.tobytes()
         
         return Part.from_bytes(data=png_bytes, mime_type='image/png')
+
+    def process_step_streaming(self, instruction: str) -> str:
+        """Process a single instruction step with STREAMING for real-time thinking display."""
+        try:
+            # Clear conversation history for new instruction
+            self.contents = []
+            
+            # Get initial screenshot
+            screenshot_part = self.get_screenshot_part()
+            
+            # Add user message with instruction and screenshot
+            self.contents.append(Content(
+                role="user",
+                parts=[
+                    Part(text=instruction),
+                    screenshot_part,
+                ]
+            ))
+            
+            config = self.get_config()
+            
+            # Agent loop with streaming
+            max_turns = 30
+            for turn in range(max_turns):
+                print(f"\n--- Turn {turn + 1} ---")
+                print("💭 Thinking (streaming)...\n", end="", flush=True)
+                
+                # Use streaming API
+                stream = self.client.models.generate_content_stream(
+                    model=self.model_name,
+                    contents=self.contents,
+                    config=config,
+                )
+                
+                # Collect all parts from stream
+                all_parts = []
+                current_text = ""
+                
+                for chunk in stream:
+                    if chunk.candidates and len(chunk.candidates) > 0:
+                        candidate = chunk.candidates[0]
+                        if candidate.content and candidate.content.parts:
+                            for part in candidate.content.parts:
+                                # Display text as it streams
+                                if hasattr(part, 'text') and part.text:
+                                    new_text = part.text[len(current_text):]
+                                    if new_text:
+                                        print(new_text, end="", flush=True)
+                                        current_text = part.text
+                                
+                                # Collect all parts
+                                all_parts.append(part)
+                
+                print()  # New line after streaming
+                
+                # Build complete content from collected parts
+                complete_content = Content(role="model", parts=all_parts)
+                self.contents.append(complete_content)
+                
+                # Check for function calls
+                function_calls = [part.function_call for part in all_parts if hasattr(part, 'function_call') and part.function_call]
+                
+                if not function_calls:
+                    # No function calls - agent might be done or thinking
+                    text_response = " ".join([part.text for part in all_parts if hasattr(part, 'text') and part.text])
+                    if "TASK_FINISHED" in text_response:
+                        return "Task Completed."
+                    if "ERROR_STUCK" in text_response:
+                        return f"Task Failed: {text_response}"
+                    
+                    return text_response if text_response else "Task completed (no response text)"
+                
+                # Execute function calls
+                print(f"\n🎯 Executing {len(function_calls)} action(s)...")
+                results = []
+                
+                for fc in function_calls:
+                    result = self.execute_function_call(fc)
+                    time.sleep(0.5)
+                    results.append((fc.name, result))
+                
+                # Capture new state
+                print("📸 Capturing state...")
+                time.sleep(0.5)
+                screenshot_bytes = self._get_screenshot_bytes()
+                
+                # Build function responses
+                response_parts = []
+                for name, result in results:
+                    if "url" not in result:
+                        result["url"] = "android://device"
+                    
+                    response_parts.append(
+                        Part(function_response=types.FunctionResponse(
+                            name=name,
+                            response=result,
+                        ))
+                    )
+                
+                response_parts.append(Part.from_bytes(data=screenshot_bytes, mime_type='image/png'))
+                self.contents.append(Content(role="user", parts=response_parts))
+            
+            return "Max turns reached - task may be incomplete"
+            
+        except Exception as e:
+            print(f"Error: {e}")
+            traceback.print_exc()
+            return f"Error: {e}"
+
 
     def process_step(self, instruction: str) -> str:
         """Process a single instruction step with the agent loop."""
@@ -478,12 +725,28 @@ class GeminiAgent:
                 candidate = response.candidates[0]
                 self.contents.append(candidate.content)
                 
+                # Display thinking process if available
+                for part in candidate.content.parts:
+                    if hasattr(part, 'thought') and part.thought:
+                        print(f"\n💭 [Thinking Process]:\n{part.text}")
+                    elif hasattr(part, 'text') and part.text and not part.function_call:
+                        # Show regular text output (observations, reasoning)
+                        if part.text.strip() and "TASK_FINISHED" not in part.text and "ERROR_STUCK" not in part.text:
+                            print(f"\n🤔 [Agent]: {part.text}")
+                
                 # Check for function calls
                 function_calls = [part.function_call for part in candidate.content.parts if part.function_call]
                 
                 if not function_calls:
-                    # No function calls - agent is done
+                    # No function calls - agent might be done or thinking
                     text_response = " ".join([part.text for part in candidate.content.parts if part.text])
+                    if "TASK_FINISHED" in text_response:
+                        return "Task Completed."
+                    if "ERROR_STUCK" in text_response:
+                        return f"Task Failed: {text_response}"
+                    
+                    # If model just talks without tool calls, we print it but might want to continue depending on logic?
+                    # For now, if no tool calls and no special keywords, return response (legacy behavior)
                     return text_response if text_response else "Task completed (no response text)"
                 
                 # Execute function calls
@@ -544,6 +807,8 @@ def main():
     parser.add_argument("--max_width", type=int, default=800, help="Max width for scrcpy stream")
     parser.add_argument("--instruction", help="Initial instruction to the agent")
     parser.add_argument("--use_adb", action="store_true", help="Use pure ADB mode (slower but reliable)")
+    parser.add_argument("--streaming", action="store_true", help="Enable streaming mode for real-time thinking display")
+
     
     args = parser.parse_args()
     
@@ -588,10 +853,16 @@ def main():
 
     if agent.use_adb_fallback:
         print("Running in ADB Mode (1-2s per frame latency).")
+    
+    if args.streaming:
+        print("✨ Streaming mode enabled - you will see real-time thinking process")
 
     if args.instruction:
         print(f"Executing: {args.instruction}")
-        result = agent.process_step(args.instruction)
+        if args.streaming:
+            result = agent.process_step_streaming(args.instruction)
+        else:
+            result = agent.process_step(args.instruction)
         print(f"Result: {result}")
     
     # Interactive Loop
@@ -602,8 +873,12 @@ def main():
                 break
             
             print("Processing...")
-            result = agent.process_step(user_input)
+            if args.streaming:
+                result = agent.process_step_streaming(user_input)
+            else:
+                result = agent.process_step(user_input)
             print("Gemini says:", result)
+
             
     except KeyboardInterrupt:
         print("Stopping...")

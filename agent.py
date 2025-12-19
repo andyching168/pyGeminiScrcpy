@@ -210,6 +210,79 @@ class GeminiAgent:
         
         # State to coordinate input between main loop and listener thread
         self.is_processing = False
+        
+        # Termux notification support
+        self.notifications_enabled = False
+        self.notification_id = "gemini_agent"
+        self.current_turn = 0
+        self._check_termux_notification()
+    
+    def _check_termux_notification(self):
+        """Check if termux-notification is available."""
+        if not IS_TERMUX:
+            return
+        try:
+            result = subprocess.run(
+                ["which", "termux-notification"],
+                capture_output=True,
+                timeout=5
+            )
+            if result.returncode == 0:
+                self.notifications_enabled = True
+                print("🔔 Termux notifications enabled")
+            else:
+                print("💡 Install Termux:API for notifications: pkg install termux-api")
+        except:
+            pass
+    
+    def send_notification(self, title: str, content: str, action_type: str = "info"):
+        """Send a Termux notification."""
+        if not self.notifications_enabled:
+            return
+        
+        try:
+            # Icon based on action type
+            icons = {
+                "click": "👆",
+                "type": "⌨️",
+                "scroll": "📜",
+                "home": "🏠",
+                "back": "◀️",
+                "launch": "🚀",
+                "thinking": "💭",
+                "done": "✅",
+                "error": "❌",
+                "info": "ℹ️",
+            }
+            icon = icons.get(action_type, "🤖")
+            
+            # Build notification command
+            cmd = [
+                "termux-notification",
+                "--id", self.notification_id,
+                "--title", f"{icon} {title}",
+                "--content", content,
+                "--ongoing",  # Keep notification visible
+                "--alert-once",  # Don't make sound every update
+            ]
+            
+            subprocess.run(cmd, capture_output=True, timeout=5)
+        except Exception as e:
+            # Silently fail - notifications are optional
+            pass
+    
+    def clear_notification(self):
+        """Clear the ongoing notification."""
+        if not self.notifications_enabled:
+            return
+        try:
+            subprocess.run(
+                ["termux-notification-remove", self.notification_id],
+                capture_output=True,
+                timeout=5
+            )
+        except:
+            pass
 
     def _get_installed_packages(self) -> List[str]:
         """Get list of installed 3rd party packages via ADB."""
@@ -685,28 +758,60 @@ class GeminiAgent:
         
         print(f"Function call: {name}({args})")
         
+        # Send notification for this action
+        action_type = "info"
+        notification_content = ""
+        
         # Handle predefined Computer Use actions
         if name == "open_web_browser":
+            action_type = "launch"
+            notification_content = "Opening web browser"
+            self.send_notification(f"Turn {self.current_turn}", notification_content, action_type)
             return self._execute_open_browser()
         elif name == "click_at":
-            return self._execute_click_at(args.get("x", 0), args.get("y", 0))
+            x, y = args.get("x", 0), args.get("y", 0)
+            action_type = "click"
+            notification_content = f"Clicking at ({x}, {y})"
+            self.send_notification(f"Turn {self.current_turn}", notification_content, action_type)
+            return self._execute_click_at(x, y)
         elif name == "type_text_at":
             # First click, then type
             if "x" in args and "y" in args:
                 self._execute_click_at(args["x"], args["y"])
                 time.sleep(0.3)
-            return self._execute_type_text(args.get("text", ""), args.get("press_enter", False))
+            action_type = "type"
+            text = args.get("text", "")
+            notification_content = f"Typing: {text[:30]}..." if len(text) > 30 else f"Typing: {text}"
+            self.send_notification(f"Turn {self.current_turn}", notification_content, action_type)
+            return self._execute_type_text(text, args.get("press_enter", False))
         elif name == "type":
-            return self._execute_type_text(args.get("text", ""), args.get("press_enter", False))
+            action_type = "type"
+            text = args.get("text", "")
+            notification_content = f"Typing: {text[:30]}..." if len(text) > 30 else f"Typing: {text}"
+            self.send_notification(f"Turn {self.current_turn}", notification_content, action_type)
+            return self._execute_type_text(text, args.get("press_enter", False))
         elif name == "scroll" or name == "scroll_at" or name == "scroll_document":
-            return self._execute_scroll(args.get("x", 500), args.get("y", 500), args.get("direction", "down"))
+            direction = args.get("direction", "down")
+            action_type = "scroll"
+            notification_content = f"Scrolling {direction}"
+            self.send_notification(f"Turn {self.current_turn}", notification_content, action_type)
+            return self._execute_scroll(args.get("x", 500), args.get("y", 500), direction)
         elif name == "navigate":
-            return self._execute_navigate(args.get("url", "https://www.google.com"))
+            action_type = "launch"
+            url = args.get("url", "https://www.google.com")
+            notification_content = f"Navigating to {url[:30]}..."
+            self.send_notification(f"Turn {self.current_turn}", notification_content, action_type)
+            return self._execute_navigate(url)
         elif name == "search":
+            action_type = "launch"
+            notification_content = "Opening search"
+            self.send_notification(f"Turn {self.current_turn}", notification_content, action_type)
             return self._execute_open_browser()
         elif name == "wait":
             delay = args.get("seconds", 1)
             print(f"ACTION: Wait {delay}s")
+            notification_content = f"Waiting {delay} seconds..."
+            self.send_notification(f"Turn {self.current_turn}", notification_content, "info")
             time.sleep(delay)
             return {"status": "waited", "seconds": delay, "url": "android://device"}
         elif name.startswith("wait_") and name.endswith("_seconds"):
@@ -716,21 +821,42 @@ class GeminiAgent:
             except (IndexError, ValueError):
                 delay = 3
             print(f"ACTION: Wait {delay}s (from {name})")
+            notification_content = f"Waiting {delay} seconds..."
+            self.send_notification(f"Turn {self.current_turn}", notification_content, "info")
             time.sleep(delay)
             return {"status": "waited", "seconds": delay, "url": "android://device"}
         # Handle custom functions
         elif name == "long_press_at":
-            return self._execute_long_press(args.get("x", 0), args.get("y", 0))
+            x, y = args.get("x", 0), args.get("y", 0)
+            action_type = "click"
+            notification_content = f"Long press at ({x}, {y})"
+            self.send_notification(f"Turn {self.current_turn}", notification_content, action_type)
+            return self._execute_long_press(x, y)
         elif name == "go_home":
+            action_type = "home"
+            notification_content = "Pressing Home"
+            self.send_notification(f"Turn {self.current_turn}", notification_content, action_type)
             return self._execute_go_home()
         elif name == "go_back":
+            action_type = "back"
+            notification_content = "Pressing Back"
+            self.send_notification(f"Turn {self.current_turn}", notification_content, action_type)
             return self._execute_go_back()
         elif name == "open_app":
-            return self._execute_open_app(args.get("app_name", ""))
+            app_name = args.get("app_name", "")
+            action_type = "launch"
+            notification_content = f"Opening app: {app_name}"
+            self.send_notification(f"Turn {self.current_turn}", notification_content, action_type)
+            return self._execute_open_app(app_name)
         elif name == "launch_package":
-            return self._execute_launch_package(args.get("package_name", ""))
+            package_name = args.get("package_name", "")
+            action_type = "launch"
+            notification_content = f"Launching: {package_name}"
+            self.send_notification(f"Turn {self.current_turn}", notification_content, action_type)
+            return self._execute_launch_package(package_name)
         else:
             print(f"Unknown function: {name}")
+            self.send_notification(f"Turn {self.current_turn}", f"Unknown: {name}", "error")
             return {"status": "error", "message": f"Unknown function: {name}", "url": "android://device"}
 
     def get_screenshot_part(self) -> Part:
@@ -794,6 +920,25 @@ class GeminiAgent:
         with self.skip_lock:
             self.skip_to_next_turn = False
             self.user_hint = ""
+        
+        # Termux mode: countdown to let user switch to target app
+        countdown = getattr(self, 'startup_delay', 5)
+        if IS_TERMUX and self.use_adb_fallback and countdown > 0:
+            print(f"\n⏳ Starting in {countdown} seconds - switch to target app now!")
+            self.send_notification("Get Ready!", f"Starting in {countdown}s - switch to target app", "info")
+            
+            for i in range(countdown, 0, -1):
+                print(f"   {i}...", flush=True)
+                self.send_notification("Get Ready!", f"Starting in {i}s...", "info")
+                time.sleep(1)
+            
+            print("   🚀 Starting!\n")
+            self.send_notification("Starting!", instruction[:30] + "..." if len(instruction) > 30 else instruction, "launch")
+            time.sleep(0.5)  # Brief pause after countdown
+        
+        # Send initial notification (non-Termux mode or no delay)
+        else:
+            self.send_notification("Starting Task", instruction[:50] + "..." if len(instruction) > 50 else instruction, "info")
             
         try:
             # Clear conversation history for new instruction
@@ -816,8 +961,12 @@ class GeminiAgent:
             # Agent loop with streaming
             max_turns = 30
             for turn in range(max_turns):
+                self.current_turn = turn + 1
                 print(f"\n--- Turn {turn + 1} ---")
                 print("💭 Thinking (streaming)...\n", end="", flush=True)
+                
+                # Send thinking notification
+                self.send_notification(f"Turn {turn + 1}", "Thinking...", "thinking")
                 
                 # Use streaming API
                 stream = self.client.models.generate_content_stream(
@@ -910,7 +1059,6 @@ class GeminiAgent:
                 complete_content = Content(role="model", parts=final_parts)
                 self.contents.append(complete_content)
                 
-                
                 # Check for function calls (use final_parts)
                 function_calls = [part.function_call for part in final_parts if hasattr(part, 'function_call') and part.function_call]
                 
@@ -918,10 +1066,15 @@ class GeminiAgent:
                     # No function calls - agent might be done or thinking
                     text_response = " ".join([part.text for part in final_parts if hasattr(part, 'text') and part.text])
                     if "TASK_FINISHED" in text_response:
+                        self.send_notification("Task Completed", "✅ Successfully finished!", "done")
+                        self.clear_notification()
                         return "Task Completed."
                     if "ERROR_STUCK" in text_response:
+                        self.send_notification("Task Failed", text_response[:50], "error")
+                        self.clear_notification()
                         return f"Task Failed: {text_response}"
                     
+                    self.clear_notification()
                     return text_response if text_response else "Task completed (no response text)"
                 
                 # Check if user requested to skip to next turn
@@ -1323,6 +1476,7 @@ def main():
     parser.add_argument("--device", "-s", help="Device serial (IP:port for wireless ADB)")
     parser.add_argument("--pair", action="store_true", help="Pair with wireless ADB device first")
     parser.add_argument("--connect", type=str, help="Connect to wireless ADB device (IP:port)")
+    parser.add_argument("--delay", type=int, default=5, help="Countdown seconds before starting in Termux mode (default: 5, use 0 to disable)")
     
     args = parser.parse_args()
     
@@ -1418,6 +1572,9 @@ def main():
     # Set device serial for ADB commands
     if args.device:
         agent.device_serial = args.device
+    
+    # Set startup delay for Termux mode
+    agent.startup_delay = args.delay
     
     if args.debug and HAS_CV2:
         agent.start_debug_loop()

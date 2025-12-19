@@ -135,6 +135,30 @@ python termux_mode.py
 - ✅ 支援無線 ADB 配對和連接
 - ✅ 同時支援 `GOOGLE_API_KEY` 和 `GEMINI_API_KEY` 環境變數
 - ✅ 完整的 AI Agent 功能（思考、工具調用等）
+- ✅ **每一步操作都會發送 Termux 通知！**
+
+### 🔔 啟用通知功能
+
+安裝 Termux:API 來獲得通知支援：
+
+```bash
+# 安裝 termux-api 套件
+pkg install termux-api
+
+# 同時需要安裝 Termux:API app
+# 從 F-Droid 下載：https://f-droid.org/packages/com.termux.api/
+```
+
+通知類型：
+- 💭 **Thinking** - AI 正在思考
+- 👆 **Click** - 點擊操作
+- ⌨️ **Type** - 輸入文字
+- 📜 **Scroll** - 滾動操作
+- 🚀 **Launch** - 啟動 App
+- 🏠 **Home** - 返回桌面
+- ◀️ **Back** - 返回鍵
+- ✅ **Done** - 任務完成
+- ❌ **Error** - 發生錯誤
 
 ### 範例對話（agent.py）
 

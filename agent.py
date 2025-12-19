@@ -233,6 +233,10 @@ class GeminiAgent:
         # Shizuku shell support (for running without WiFi ADB)
         self.shizuku_shell = SHIZUKU_SHELL
         self.use_shizuku = SHIZUKU_SHELL is not None
+        
+        # Game mode: uses different touch method for Unity/games
+        self.game_mode = False
+        self.touch_device = None  # Will be auto-detected
     
     def _check_termux_notification(self):
         """Check if termux-notification is available."""
@@ -726,6 +730,80 @@ class GeminiAgent:
         """Convert normalized y (0-999) to scrcpy stream coordinate."""
         return int((y / 1000.0) * self.height)
 
+    def _detect_touch_device(self):
+        """Detect the touch input device for sendevent."""
+        if self.touch_device:
+            return self.touch_device
+        
+        # Common touch device paths
+        candidates = [
+            "/dev/input/event1",
+            "/dev/input/event2", 
+            "/dev/input/event0",
+            "/dev/input/event3",
+        ]
+        
+        # Try to find touchscreen device
+        try:
+            if self.use_shizuku and self.shizuku_shell:
+                code, stdout, _ = self.shizuku_shell.run("getevent -pl", timeout=5)
+                if code == 0 and stdout:
+                    lines = stdout.split('\n')
+                    current_device = None
+                    for line in lines:
+                        if line.startswith('/dev/input/'):
+                            current_device = line.strip().rstrip(':')
+                        if 'ABS_MT_POSITION' in line or 'ABS_MT_TOUCH' in line:
+                            if current_device:
+                                self.touch_device = current_device
+                                print(f"🎮 Detected touch device: {self.touch_device}")
+                                return self.touch_device
+        except Exception as e:
+            print(f"Touch device detection failed: {e}")
+        
+        # Use default
+        self.touch_device = "/dev/input/event1"
+        print(f"🎮 Using default touch device: {self.touch_device}")
+        return self.touch_device
+
+    def _sendevent_tap(self, x: int, y: int):
+        """
+        Simulate tap using sendevent (more compatible with games).
+        Uses ABS_MT_* events for multi-touch protocol.
+        """
+        device = self._detect_touch_device()
+        
+        # Get screen dimensions for coordinate mapping
+        real_w, real_h = self._get_real_screen_size()
+        if not real_w or not real_h:
+            real_w, real_h = 1080, 2400  # Fallback
+        
+        # sendevent coordinates are typically 0-32767 range
+        # But some devices use actual pixel values
+        # Try pixel values first (more common on modern devices)
+        
+        # Multi-touch protocol B events
+        commands = [
+            # Touch down
+            f"sendevent {device} 3 57 0",      # ABS_MT_TRACKING_ID = 0
+            f"sendevent {device} 3 53 {x}",    # ABS_MT_POSITION_X
+            f"sendevent {device} 3 54 {y}",    # ABS_MT_POSITION_Y
+            f"sendevent {device} 3 58 50",     # ABS_MT_PRESSURE
+            f"sendevent {device} 3 48 5",      # ABS_MT_TOUCH_MAJOR
+            f"sendevent {device} 1 330 1",     # BTN_TOUCH = 1
+            f"sendevent {device} 0 0 0",       # SYN_REPORT
+            # Small delay (handled by shell)
+            "sleep 0.05",
+            # Touch up
+            f"sendevent {device} 3 57 -1",     # ABS_MT_TRACKING_ID = -1 (lift)
+            f"sendevent {device} 1 330 0",     # BTN_TOUCH = 0
+            f"sendevent {device} 0 0 0",       # SYN_REPORT
+        ]
+        
+        # Execute all commands
+        full_cmd = " && ".join(commands)
+        self._adb_shell(["sh", "-c", full_cmd])
+
     # --- ADB Action Executors ---
     def _adb_shell(self, cmd_args):
         """Run shell command via Shizuku or ADB."""
@@ -755,8 +833,15 @@ class GeminiAgent:
             # ADB mode: use real device coordinates
             actual_x = self.denormalize_x_for_adb(x)
             actual_y = self.denormalize_y_for_adb(y)
-            print(f"ACTION: Click at ({actual_x}, {actual_y}) [normalized: {x}, {y}] [ADB mode, real: {real_w}x{real_h}]")
-            self._adb_shell(["input", "tap", str(actual_x), str(actual_y)])
+            
+            if self.game_mode:
+                # Game mode: use sendevent for Unity/games
+                print(f"ACTION: Click at ({actual_x}, {actual_y}) [normalized: {x}, {y}] [GAME mode, sendevent]")
+                self._sendevent_tap(actual_x, actual_y)
+            else:
+                # Normal mode: use input tap
+                print(f"ACTION: Click at ({actual_x}, {actual_y}) [normalized: {x}, {y}] [ADB mode, real: {real_w}x{real_h}]")
+                self._adb_shell(["input", "tap", str(actual_x), str(actual_y)])
         elif self.scrcpy_client:
             # Scrcpy mode: use scrcpy stream coordinates (works better for Unity games)
             actual_x = self.denormalize_x_for_scrcpy(x)
@@ -1795,6 +1880,7 @@ def main():
     parser.add_argument("--pair", action="store_true", help="Pair with wireless ADB device first")
     parser.add_argument("--connect", type=str, help="Connect to wireless ADB device (IP:port)")
     parser.add_argument("--delay", type=int, default=5, help="Countdown seconds before starting in Termux mode (default: 5, use 0 to disable)")
+    parser.add_argument("--game", action="store_true", help="Game mode: use sendevent for Unity/game compatibility")
     
     args = parser.parse_args()
     
@@ -1930,6 +2016,11 @@ def main():
         agent.shizuku_shell = SHIZUKU_SHELL
         agent.use_shizuku = True
         print("   Shizuku shell attached to agent")
+    
+    # Set game mode for Unity/game compatibility
+    if args.game:
+        agent.game_mode = True
+        print("🎮 Game mode enabled (using sendevent for touch)")
     
     # Set startup delay for Termux mode
     agent.startup_delay = args.delay

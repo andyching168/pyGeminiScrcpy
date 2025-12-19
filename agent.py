@@ -12,12 +12,17 @@ from google import genai
 from google.genai import types
 from google.genai.types import Content, Part
 
+# Fix for OpenCV/Qt interaction on some Linux systems (prevents QObject::moveToThread errors)
+os.environ["QT_QPA_PLATFORM"] = "xcb"
+
 # --- Configuration ---
 DEFAULT_MODEL = "gemini-3-flash-preview"
 
 # System prompt for Android control
 SYSTEM_PROMPT = """You are an AI agent operating an Android device.
 Target Device Screen: {width}x{height} (Pixel coordinates)
+Installed Apps (3rd party):
+{app_list}
 
 Your goal is to complete the user's request by interacting with the screen.
 
@@ -154,7 +159,10 @@ class GeminiAgent:
     def __init__(self, api_key, model_name=DEFAULT_MODEL, use_adb_fallback=False):
         self.client = genai.Client(api_key=api_key)
         self.model_name = model_name
+        self.client = genai.Client(api_key=api_key)
+        self.model_name = model_name
         self.use_adb_fallback = use_adb_fallback
+        self.debug_mode = False  # Changed via setter or directly if needed
         
         self.scrcpy_client = None
         self.last_frame = None
@@ -174,10 +182,51 @@ class GeminiAgent:
         self.user_hint = ""  # Optional user message when skipping
         self.skip_lock = threading.Lock()
 
+        # Debug Threading
+        self.debug_thread = None
+        self.debug_running = False
+        self.overlay_data = None
+        self.overlay_expire_time = 0
+        self.debug_status_text = ""
+        self.debug_status_expire_time = 0
+        
+        # Cache installed packages
+        self.app_list = self._get_installed_packages()
+
+    def _get_installed_packages(self) -> List[str]:
+        """Get list of installed 3rd party packages via ADB."""
+        try:
+            # Use -3 to list only third-party apps to reduce token usage and noise
+            result = subprocess.run(
+                ["adb", "shell", "pm", "list", "packages", "-3"],
+                capture_output=True,
+                text=True
+                # Don't check=True here to avoid crashing if adb fails (e.g. device not connected yet)
+            )
+            if result.returncode != 0:
+                print(f"Warning: Failed to get app list (code {result.returncode})")
+                return []
+                
+            packages = []
+            for line in result.stdout.strip().split('\n'):
+                if line.startswith('package:'):
+                    pkg = line.replace('package:', '').strip()
+                    packages.append(pkg)
+            packages.sort()
+            return packages
+        except Exception as e:
+            print(f"Failed to get package list: {e}")
+            return []
+
+
     def get_config(self) -> types.GenerateContentConfig:
         """Build configuration with generic tools for Android."""
         return types.GenerateContentConfig(
-            system_instruction=SYSTEM_PROMPT.format(width=self.width, height=self.height),
+            system_instruction=SYSTEM_PROMPT.format(
+                width=self.width, 
+                height=self.height,
+                app_list=", ".join(self.app_list) if self.app_list else "Unknown (ADB failed)"
+            ),
             tools=get_tool_definitions(),
             # 思考配置：medium 模式平衡思考深度與速度
             # thinking_budget: 0=關閉, -1=動態, 1-24576=固定預算
@@ -325,6 +374,9 @@ class GeminiAgent:
             print(f"ACTION: Click at ({actual_x}, {actual_y}) [normalized: {x}, {y}] [fallback ADB]")
             self._adb_shell(["input", "tap", str(actual_x), str(actual_y)])
         
+        if self.debug_mode:
+            self._visualize_action(actual_x, actual_y, action="click")
+
         return {"status": "clicked", "x": actual_x, "y": actual_y, "url": "android://device"}
 
     def _execute_type_text(self, text: str, press_enter: bool = False):
@@ -363,6 +415,10 @@ class GeminiAgent:
             else:
                 self._adb_shell(["input", "keyevent", "KEYCODE_ENTER"])
         
+        if self.debug_mode:
+             # For text, we might just show an overlay at center or top
+             self._visualize_action(self.width//2, self.height//2, action="type", text=text)
+
         return {"status": "typed", "text": text, "url": "android://device"}
 
     def _execute_scroll(self, x: int, y: int, direction: str):
@@ -407,6 +463,11 @@ class GeminiAgent:
             
             # Helper for swipe
             self._scrcpy_swipe_gesture(start_x, start_y, end_x, end_y)
+        
+        if self.debug_mode:
+            # Visualize scroll as an arrow
+             self._visualize_action(actual_x, actual_y, action="scroll", end_x=end_x, end_y=end_y)
+
         return {"status": "scrolled", "direction": direction, "url": "android://device"}
 
     def _scrcpy_swipe_gesture(self, start_x, start_y, end_x, end_y, steps=10, duration=0.3):
@@ -446,6 +507,10 @@ class GeminiAgent:
             self.scrcpy_client.control.touch(actual_x, actual_y, ACTION_DOWN)
             time.sleep(1.0)
             self.scrcpy_client.control.touch(actual_x, actual_y, ACTION_UP)
+        
+        if self.debug_mode:
+             self._visualize_action(actual_x, actual_y, action="long_press")
+
         return {"status": "long_pressed", "x": actual_x, "y": actual_y, "url": "android://device"}
 
     def _execute_go_home(self):
@@ -605,6 +670,11 @@ class GeminiAgent:
         _, buffer = cv2.imencode('.png', frame)
         png_bytes = buffer.tobytes()
         
+        if self.debug_mode:
+            # Update status for debug loop
+            self.debug_status_text = "Sending to Gemini..."
+            self.debug_status_expire_time = time.time() + 2.0
+
         return Part.from_bytes(data=png_bytes, mime_type='image/png')
 
     def process_step_streaming(self, instruction: str) -> str:
@@ -934,6 +1004,113 @@ class GeminiAgent:
             return f"Error: {e}"
 
 
+    print("Starting Main Loop...")
+
+    def start_debug_loop(self):
+        """Start the debug render thread."""
+        if self.debug_mode and not self.debug_running:
+            self.debug_running = True
+            self.debug_thread = threading.Thread(target=self._render_loop, daemon=True)
+            self.debug_thread.start()
+
+    def _render_loop(self):
+        """Continuous render loop for debug window."""
+        print("Debug render loop started")
+        while self.debug_running:
+            try:
+                with self.frame_lock:
+                    if self.last_frame is None:
+                        frame_to_show = None
+                    else:
+                        frame_to_show = self.last_frame.copy()
+                
+                if frame_to_show is None:
+                    time.sleep(0.1)
+                    continue
+
+                # Resize for display FIRST (to ensure consistent coordinate mapping if we wanted to map clicks, 
+                # but valid overlay text is better done on original resolution or we accept scaling artifacts)
+                # Actually, better to draw on original frame then resize.
+
+                # Draw Status
+                if time.time() < self.debug_status_expire_time:
+                    # Draw a black bar at the top
+                    h, w = frame_to_show.shape[:2]
+                    cv2.rectangle(frame_to_show, (0, 0), (w, 40), (0, 0, 0), -1)
+                    cv2.putText(frame_to_show, self.debug_status_text, (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 0), 2)
+
+                # Draw Overlay Actions
+                if self.overlay_data and time.time() < self.overlay_expire_time:
+                    self._draw_overlay(frame_to_show, self.overlay_data)
+                
+                # Resize if too big for screen
+                display_h, display_w = frame_to_show.shape[:2]
+                max_h = 900
+                if display_h > max_h:
+                    scale = max_h / display_h
+                    display_w = int(display_w * scale)
+                    display_h = max_h
+                    frame_to_show = cv2.resize(frame_to_show, (display_w, display_h))
+
+                cv2.imshow("Gemini Debug", frame_to_show)
+                cv2.waitKey(1)
+                
+                time.sleep(0.03) # ~30 FPS
+            except Exception as e:
+                # print(f"Render loop error: {e}")
+                time.sleep(1)
+        
+        try:
+            cv2.destroyAllWindows()
+        except:
+            pass
+
+    def _draw_overlay(self, frame, data):
+        """Draw action overlay on the frame."""
+        try:
+            x, y = data.get("x", 0), data.get("y", 0)
+            action = data.get("action", "")
+            end_x, end_y = data.get("end_x", 0), data.get("end_y", 0)
+            text = data.get("text", "")
+
+            color = (0, 0, 255) # Red for actions
+            thickness = 3
+            
+            label = action
+            
+            if action == "click":
+                cv2.circle(frame, (x, y), 20, color, thickness)
+                cv2.drawMarker(frame, (x, y), color, markerType=cv2.MARKER_CROSS, markerSize=30, thickness=thickness)
+                label = f"Click ({x}, {y})"
+            elif action == "long_press":
+                cv2.circle(frame, (x, y), 30, (0, 255, 255), thickness) # Yellow
+                label = f"Long Press ({x}, {y})"
+            elif action == "scroll":
+                cv2.arrowedLine(frame, (x, y), (end_x, end_y), (255, 0, 0), 5) # Blue arrow
+                label = f"Scroll"
+            elif action == "type":
+                label = f"Type: {text}"
+
+            # Add label with background
+            (w, h), _ = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 1, 2)
+            cv2.rectangle(frame, (50, 50 - h - 10), (50 + w, 50 + 10), (0, 0, 0), -1)
+            cv2.putText(frame, label, (50, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2, cv2.LINE_AA)
+            
+        except Exception as e:
+            print(f"Draw error: {e}")
+
+    def _visualize_action(self, x, y, action="click", end_x=0, end_y=0, text=None):
+        """Queue action for visualization on debug window."""
+        self.overlay_data = {
+            "x": x, 
+            "y": y, 
+            "action": action, 
+            "end_x": end_x, 
+            "end_y": end_y, 
+            "text": text
+        }
+        self.overlay_expire_time = time.time() + 1.5 # Show for 1.5s
+
 def on_frame(frame):
     if frame is not None and agent is not None:
         agent.update_frame(frame)
@@ -991,6 +1168,7 @@ def main():
     parser.add_argument("--instruction", help="Initial instruction to the agent")
     parser.add_argument("--use_adb", action="store_true", help="Use pure ADB mode (slower but reliable)")
     parser.add_argument("--streaming", action="store_true", help="Enable streaming mode for real-time thinking display")
+    parser.add_argument("--debug", action="store_true", help="Enable debug mode to show OpenCV window with actions")
 
     
     args = parser.parse_args()
@@ -1000,6 +1178,10 @@ def main():
         return
 
     agent = GeminiAgent(api_key=args.api_key, model_name=args.model, use_adb_fallback=args.use_adb)
+    agent.debug_mode = args.debug
+
+    if args.debug:
+        agent.start_debug_loop()
 
     if not args.use_adb:
         try:

@@ -661,9 +661,22 @@ class GeminiAgent:
         raise RuntimeError("No screen frame available")
 
     def _get_real_screen_size(self):
-        """Get real device screen size via ADB (cached)."""
+        """Get real device screen size via Shizuku or ADB (cached)."""
         if self.real_width and self.real_height:
             return self.real_width, self.real_height
+        
+        # Try Shizuku first
+        if self.use_shizuku and self.shizuku_shell:
+            try:
+                size = self.shizuku_shell.get_screen_size()
+                if size:
+                    self.real_width, self.real_height = size
+                    print(f"Detected screen size via Shizuku: {size[0]}x{size[1]}")
+                    return size
+            except Exception as e:
+                print(f"Shizuku screen size failed: {e}")
+        
+        # Fall back to ADB
         try:
             cmd = ["adb"]
             if hasattr(self, 'device_serial') and self.device_serial:
@@ -680,7 +693,14 @@ class GeminiAgent:
                     print(f"Detected real device screen size: {w}x{h}")
                     return w, h
         except Exception as e:
-            print(f"Failed to get screen size: {e}")
+            print(f"Failed to get screen size via ADB: {e}")
+        
+        # Use screenshot dimensions as fallback
+        if self.width and self.height:
+            print(f"Using screenshot dimensions as screen size: {self.width}x{self.height}")
+            self.real_width, self.real_height = self.width, self.height
+            return self.width, self.height
+        
         return None, None
 
     def denormalize_x_for_adb(self, x: float) -> int:

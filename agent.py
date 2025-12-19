@@ -1614,15 +1614,35 @@ def main():
     
     # Handle Shizuku mode
     if args.shizuku:
-        if SHIZUKU_SHELL is None:
-            print("❌ Shizuku not available!")
-            print("\nTo use Shizuku mode:")
-            print("1. Install Shizuku app")
-            print("2. Start Shizuku service")
-            print("3. Run: python shizuku_setup.py install")
-            print("4. Try again")
+        # Re-check Shizuku (don't rely on module-level check which may be stale)
+        try:
+            from shizuku_setup import ShizukuShell
+            shizuku = ShizukuShell()
+            if not shizuku.available:
+                print("❌ Shizuku rish not found!")
+                print("\nRun: python shizuku_setup.py install")
+                return
+            
+            if not shizuku.check_shizuku_running():
+                print("❌ Shizuku service not running!")
+                print("\nTo start Shizuku:")
+                print("1. Open Shizuku app")
+                print("2. Start the service")
+                print("3. Try again")
+                return
+            
+            # Update global for use in agent
+            global SHIZUKU_SHELL
+            SHIZUKU_SHELL = shizuku
+            print("🔰 Shizuku mode active!")
+            
+        except ImportError:
+            print("❌ shizuku_setup.py not found!")
             return
-        print("🔰 Using Shizuku mode (no WiFi ADB needed)")
+        except Exception as e:
+            print(f"❌ Shizuku error: {e}")
+            return
+        
         args.termux = True
         args.use_adb = True
     
@@ -1718,6 +1738,12 @@ def main():
     # Set device serial for ADB commands
     if args.device:
         agent.device_serial = args.device
+    
+    # Set Shizuku shell if using --shizuku mode
+    if args.shizuku and SHIZUKU_SHELL:
+        agent.shizuku_shell = SHIZUKU_SHELL
+        agent.use_shizuku = True
+        print("   Shizuku shell attached to agent")
     
     # Set startup delay for Termux mode
     agent.startup_delay = args.delay

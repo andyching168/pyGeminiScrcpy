@@ -25,13 +25,75 @@ from typing import Optional, Tuple
 # Paths
 TERMUX_BIN = "/data/data/com.termux/files/usr/bin"
 SHARED_STORAGE = "/storage/emulated/0"
+TERMUX_HOME = "/data/data/com.termux/files/home"
+
+# All possible locations for rish files
 RISH_LOCATIONS = [
-    f"{SHARED_STORAGE}/Download/rish",
-    f"{SHARED_STORAGE}/rish",
-    f"{SHARED_STORAGE}/Shizuku/rish",
+    # Termux accessible paths (via termux-setup-storage)
     os.path.expanduser("~/storage/shared/Download/rish"),
     os.path.expanduser("~/storage/shared/rish"),
+    os.path.expanduser("~/storage/downloads/rish"),
+    # Android shared storage
+    f"{SHARED_STORAGE}/Download/rish",
+    f"{SHARED_STORAGE}/Downloads/rish",
+    f"{SHARED_STORAGE}/rish",
+    f"{SHARED_STORAGE}/Shizuku/rish",
+    f"{SHARED_STORAGE}/Documents/rish",
+    # Already installed
+    f"{TERMUX_BIN}/rish",
+    f"{TERMUX_HOME}/rish",
 ]
+
+
+def find_rish_files():
+    """Search for rish and rish_shizuku.dex files."""
+    print("🔍 Searching for rish files...\n")
+    
+    found_rish = []
+    found_dex = []
+    
+    # Check all known locations
+    for path in RISH_LOCATIONS:
+        if os.path.exists(path):
+            found_rish.append(path)
+            print(f"   ✓ Found rish: {path}")
+        
+        dex_path = path.replace("rish", "rish_shizuku.dex")
+        if os.path.exists(dex_path):
+            found_dex.append(dex_path)
+            print(f"   ✓ Found dex: {dex_path}")
+    
+    # Also try to find using find command
+    try:
+        result = subprocess.run(
+            ["find", SHARED_STORAGE, "-name", "rish", "-type", "f", "2>/dev/null"],
+            capture_output=True, text=True, timeout=30, shell=False
+        )
+        for line in result.stdout.strip().split('\n'):
+            if line and line not in found_rish:
+                found_rish.append(line)
+                print(f"   ✓ Found rish: {line}")
+    except:
+        pass
+    
+    if not found_rish:
+        print("   ❌ No rish files found!")
+        print("\n📋 To export files from Shizuku:")
+        print("   1. Open Shizuku app")
+        print("   2. Scroll down to '使用 Shizuku 的終端應用' / 'Use Shizuku in terminal apps'")
+        print("   3. Tap '導出文件' / 'Export files'")
+        print("   4. Save to 'Download' folder")
+        print("\n📁 Expected file locations after export:")
+        print(f"   • {SHARED_STORAGE}/Download/rish")
+        print(f"   • {SHARED_STORAGE}/Download/rish_shizuku.dex")
+        print("\n💡 Make sure Termux has storage access:")
+        print("   termux-setup-storage")
+    else:
+        print(f"\n✅ Found {len(found_rish)} rish file(s)")
+        if found_dex:
+            print(f"✅ Found {len(found_dex)} dex file(s)")
+    
+    return found_rish, found_dex
 
 
 class ShizukuShell:
@@ -167,31 +229,19 @@ class ShizukuShell:
 
 def install_rish():
     """Install rish to Termux bin directory."""
-    print("📦 Installing rish to Termux...")
+    print("📦 Installing rish to Termux...\n")
     
-    # Find rish file
-    rish_source = None
-    dex_source = None
+    # First, find the files
+    found_rish, found_dex = find_rish_files()
     
-    for base_path in RISH_LOCATIONS:
-        if os.path.exists(base_path):
-            rish_source = base_path
-            dex_path = base_path.replace("rish", "rish_shizuku.dex")
-            if os.path.exists(dex_path):
-                dex_source = dex_path
-            break
-    
-    if not rish_source:
-        print("❌ rish file not found!")
-        print("\nTo install:")
-        print("1. Open Shizuku app")
-        print("2. Go to 'Use Shizuku in terminal apps'")
-        print("3. Tap 'Export files'")
-        print("4. Save to Download folder")
-        print("5. Run this script again")
+    if not found_rish:
         return False
     
-    print(f"   Found: {rish_source}")
+    # Use the first found rish
+    rish_source = found_rish[0]
+    dex_source = found_dex[0] if found_dex else None
+    
+    print(f"\n📁 Using: {rish_source}")
     
     # Copy to Termux bin
     dest_rish = os.path.join(TERMUX_BIN, "rish")
@@ -223,12 +273,13 @@ def install_rish():
             )
             with open(dest_rish, 'w') as f:
                 f.write(content)
-            print("   ✓ Updated package ID")
+            print("   ✓ Updated package ID to com.termux")
     except Exception as e:
         print(f"   ⚠️ Could not update package ID: {e}")
     
     print("\n✅ rish installed successfully!")
     print("   Now you can use: rish -c 'your command'")
+    print("\n🧪 Test with: python shizuku_setup.py check")
     return True
 
 
@@ -299,19 +350,27 @@ def main():
     
     if len(sys.argv) < 2:
         print("\nUsage:")
+        print("  python shizuku_setup.py find      - Search for rish files")
         print("  python shizuku_setup.py install   - Install rish to Termux")
         print("  python shizuku_setup.py check     - Check Shizuku status")
         print("  python shizuku_setup.py test      - Run test command")
-        print("\nWhat is Shizuku?")
-        print("  Shizuku lets you run ADB commands without:")
-        print("  - WiFi debugging")
-        print("  - PC connection (after initial setup)")
-        print("  - Root (optional)")
+        print("\n📁 Where to put rish files:")
+        print(f"   Export from Shizuku app to: {SHARED_STORAGE}/Download/")
+        print("   Files needed:")
+        print("   • rish")
+        print("   • rish_shizuku.dex")
+        print("\n💡 First time setup:")
+        print("   1. termux-setup-storage    # Grant storage access")
+        print("   2. Export files from Shizuku app")
+        print("   3. python shizuku_setup.py install")
+        print("   4. python shizuku_setup.py check")
         return
     
     command = sys.argv[1].lower()
     
-    if command == "install":
+    if command == "find":
+        find_rish_files()
+    elif command == "install":
         install_rish()
     elif command == "check":
         check_status()

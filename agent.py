@@ -609,25 +609,48 @@ class GeminiAgent:
             
             raise RuntimeError("No screen frame available after 3 attempts")
         
-        # Normal mode with OpenCV
-        frame = None
+        # Mode with OpenCV - also add retry logic
+        print(f"[DEBUG] OpenCV mode: taking screenshot (use_adb_fallback={self.use_adb_fallback})")
         
+        for attempt in range(3):
+            frame = None
+            
+            if self.use_adb_fallback:
+                frame = self.get_adb_screenshot()
+            else:
+                with self.frame_lock:
+                    if self.last_frame is not None:
+                        frame = self.last_frame.copy()
+            
+            if frame is not None:
+                try:
+                    # Update dimensions
+                    self.height, self.width = frame.shape[:2]
+                    
+                    # Convert to PNG bytes
+                    success, buffer = cv2.imencode('.png', frame)
+                    if success:
+                        print(f"[DEBUG] OpenCV screenshot OK: {self.width}x{self.height}")
+                        return buffer.tobytes()
+                except Exception as e:
+                    print(f"[DEBUG] OpenCV encode failed: {e}")
+            
+            # Retry
+            if attempt < 2:
+                print(f"Screenshot attempt {attempt + 1} failed (OpenCV mode), retrying...")
+                time.sleep(1)
+        
+        # Last resort: try raw bytes without OpenCV
         if self.use_adb_fallback:
-            frame = self.get_adb_screenshot()
-        else:
-            with self.frame_lock:
-                if self.last_frame is not None:
-                    frame = self.last_frame.copy()
+            print("[DEBUG] OpenCV failed, trying raw PNG...")
+            try:
+                png_bytes = self.get_adb_screenshot_bytes()
+                if png_bytes and self._validate_png(png_bytes):
+                    return png_bytes
+            except:
+                pass
         
-        if frame is None:
-            raise RuntimeError("No screen frame available")
-        
-        # Update dimensions
-        self.height, self.width = frame.shape[:2]
-        
-        # Convert to PNG bytes
-        _, buffer = cv2.imencode('.png', frame)
-        return buffer.tobytes()
+        raise RuntimeError("No screen frame available")
 
     def _get_real_screen_size(self):
         """Get real device screen size via ADB (cached)."""

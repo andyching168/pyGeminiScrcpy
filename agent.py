@@ -4,16 +4,31 @@ import argparse
 import threading
 import subprocess
 import traceback
-import cv2
-import numpy as np
 from typing import Optional, Dict, Any, List
+
+# Termux detection - set before importing OpenCV
+IS_TERMUX = os.path.exists("/data/data/com.termux")
+
+# Try to import OpenCV (optional for Termux)
+try:
+    import cv2
+    import numpy as np
+    HAS_CV2 = True
+except ImportError:
+    HAS_CV2 = False
+    # Provide fallback numpy
+    try:
+        import numpy as np
+    except ImportError:
+        np = None
 
 from google import genai
 from google.genai import types
 from google.genai.types import Content, Part
 
 # Fix for OpenCV/Qt interaction on some Linux systems (prevents QObject::moveToThread errors)
-os.environ["QT_QPA_PLATFORM"] = "xcb"
+if not IS_TERMUX:
+    os.environ["QT_QPA_PLATFORM"] = "xcb"
 
 # --- Configuration ---
 DEFAULT_MODEL = "gemini-3-flash-preview"
@@ -276,17 +291,63 @@ class GeminiAgent:
     def get_adb_screenshot(self):
         """Capture screenshot directly via ADB (Slower but reliable)"""
         try:
-            cmd = ["adb", "exec-out", "screencap", "-p"]
-            result = subprocess.run(cmd, capture_output=True, check=True)
-            image_data = np.frombuffer(result.stdout, np.uint8)
-            frame = cv2.imdecode(image_data, cv2.IMREAD_COLOR)
-            return frame
+            # Use device serial if set
+            cmd = ["adb"]
+            if hasattr(self, 'device_serial') and self.device_serial:
+                cmd.extend(["-s", self.device_serial])
+            cmd.extend(["exec-out", "screencap", "-p"])
+            
+            result = subprocess.run(cmd, capture_output=True, check=True, timeout=10)
+            
+            if HAS_CV2:
+                image_data = np.frombuffer(result.stdout, np.uint8)
+                frame = cv2.imdecode(image_data, cv2.IMREAD_COLOR)
+                return frame
+            else:
+                # Termux mode without OpenCV - return raw PNG bytes
+                return result.stdout
+        except subprocess.TimeoutExpired:
+            print("ADB Screenshot timeout")
+            return None
+        except Exception as e:
+            print(f"ADB Screenshot failed: {e}")
+            return None
+
+    def get_adb_screenshot_bytes(self) -> bytes:
+        """Capture screenshot via ADB and return as PNG bytes (for Termux mode)."""
+        try:
+            cmd = ["adb"]
+            if hasattr(self, 'device_serial') and self.device_serial:
+                cmd.extend(["-s", self.device_serial])
+            cmd.extend(["exec-out", "screencap", "-p"])
+            
+            result = subprocess.run(cmd, capture_output=True, check=True, timeout=10)
+            return result.stdout
         except Exception as e:
             print(f"ADB Screenshot failed: {e}")
             return None
 
     def _get_screenshot_bytes(self) -> bytes:
         """Capture current screen and return as PNG bytes."""
+        # Termux mode without OpenCV - get raw PNG bytes from ADB
+        if self.use_adb_fallback and not HAS_CV2:
+            png_bytes = self.get_adb_screenshot_bytes()
+            if png_bytes is None:
+                raise RuntimeError("No screen frame available")
+            
+            # Try to get dimensions from PNG header (width/height at bytes 16-24)
+            if len(png_bytes) > 24:
+                import struct
+                # PNG IHDR chunk contains width (4 bytes) and height (4 bytes) at offset 16
+                try:
+                    self.width = struct.unpack('>I', png_bytes[16:20])[0]
+                    self.height = struct.unpack('>I', png_bytes[20:24])[0]
+                except:
+                    pass  # Keep default dimensions
+            
+            return png_bytes
+        
+        # Normal mode with OpenCV
         frame = None
         
         if self.use_adb_fallback:
@@ -654,26 +715,10 @@ class GeminiAgent:
 
     def get_screenshot_part(self) -> Part:
         """Capture current screen and return as Part."""
-        frame = None
+        # Use shared method that handles both Termux and normal mode
+        png_bytes = self._get_screenshot_bytes()
         
-        if self.use_adb_fallback:
-            frame = self.get_adb_screenshot()
-        else:
-            with self.frame_lock:
-                if self.last_frame is not None:
-                    frame = self.last_frame.copy()
-        
-        if frame is None:
-            raise RuntimeError("No screen frame available")
-        
-        # Update dimensions
-        self.height, self.width = frame.shape[:2]
-        
-        # Convert to PNG bytes
-        _, buffer = cv2.imencode('.png', frame)
-        png_bytes = buffer.tobytes()
-        
-        if self.debug_mode:
+        if self.debug_mode and HAS_CV2:
             # Update status for debug loop
             self.debug_status_text = "Sending to Gemini..."
             self.debug_status_expire_time = time.time() + 2.0
@@ -1245,25 +1290,90 @@ agent = None
 def main():
     global agent
     parser = argparse.ArgumentParser(description="Gemini Scrcpy Agent")
-    parser.add_argument("--api_key", help="Google AI Studio API Key", default=os.environ.get("GOOGLE_API_KEY"))
+    parser.add_argument("--api_key", help="Google AI Studio API Key", default=os.environ.get("GOOGLE_API_KEY") or os.environ.get("GEMINI_API_KEY"))
     parser.add_argument("--model", help="Gemini Model Name", default=DEFAULT_MODEL)
     parser.add_argument("--max_width", type=int, default=800, help="Max width for scrcpy stream")
     parser.add_argument("--instruction", help="Initial instruction to the agent")
     parser.add_argument("--use_adb", action="store_true", help="Use pure ADB mode (slower but reliable)")
     parser.add_argument("--streaming", action="store_true", help="Enable streaming mode for real-time thinking display")
     parser.add_argument("--debug", action="store_true", help="Enable debug mode to show OpenCV window with actions")
-
+    
+    # Termux mode options
+    parser.add_argument("--termux", action="store_true", help="Termux mode: use ADB, no GUI, wireless ADB support")
+    parser.add_argument("--device", "-s", help="Device serial (IP:port for wireless ADB)")
+    parser.add_argument("--pair", action="store_true", help="Pair with wireless ADB device first")
+    parser.add_argument("--connect", type=str, help="Connect to wireless ADB device (IP:port)")
     
     args = parser.parse_args()
     
+    # Auto-detect Termux environment
+    if IS_TERMUX and not args.use_adb:
+        print("📱 Termux detected, enabling ADB mode automatically")
+        args.termux = True
+    
+    # Handle Termux/wireless ADB setup
+    if args.termux or args.pair or args.connect:
+        try:
+            from wireless_adb import WirelessADB, interactive_setup
+            wadb = WirelessADB()
+            
+            if args.pair:
+                print("\n🔗 Wireless ADB Pairing Mode")
+                interactive_setup()
+                return
+            
+            if args.connect:
+                if ':' in args.connect:
+                    host, port = args.connect.rsplit(':', 1)
+                else:
+                    host, port = args.connect, "5555"
+                success, msg = wadb.connect(host, int(port))
+                print(msg)
+                if not success:
+                    return
+                # Set device serial for ADB commands
+                args.device = f"{host}:{port}"
+            
+            # Check connected devices
+            devices = wadb.get_connected_devices()
+            if not devices:
+                print("❌ No devices connected!")
+                print("   Use --pair to pair a device, or --connect IP:port to connect")
+                return
+            
+            # Auto-select device if not specified
+            if not args.device:
+                for d in devices:
+                    if d['status'] == 'device':
+                        args.device = d['serial']
+                        print(f"✅ Using device: {args.device}")
+                        break
+        except ImportError:
+            print("⚠️ wireless_adb.py not found, continuing with default ADB")
+        except Exception as e:
+            print(f"⚠️ Wireless ADB setup failed: {e}")
+    
+    # Force ADB mode for Termux
+    if args.termux:
+        args.use_adb = True
+        args.debug = False  # No GUI in Termux
+        if not HAS_CV2:
+            print("📱 Running without OpenCV (Termux lightweight mode)")
+    
     if not args.api_key:
         print("Error: API Key is required.")
+        print("   Set with: export GEMINI_API_KEY='your-key'")
+        print("   Or use: --api_key YOUR_KEY")
         return
 
     agent = GeminiAgent(api_key=args.api_key, model_name=args.model, use_adb_fallback=args.use_adb)
     agent.debug_mode = args.debug
-
-    if args.debug:
+    
+    # Set device serial for ADB commands
+    if args.device:
+        agent.device_serial = args.device
+    
+    if args.debug and HAS_CV2:
         agent.start_debug_loop()
 
     if not args.use_adb:

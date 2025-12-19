@@ -89,7 +89,26 @@ adb devices
 
 ## 🚀 運行
 
-### Termux 模式（推薦）
+### 方法 1：使用 agent.py（完整 AI 功能）
+
+```bash
+# 設定 API Key
+export GEMINI_API_KEY="your-api-key"
+
+# 使用 Termux 模式運行
+python agent.py --termux --streaming
+
+# 連接到無線 ADB 裝置並運行
+python agent.py --termux --connect 192.168.1.100:5555 --streaming
+
+# 配對新裝置
+python agent.py --pair
+
+# 指定裝置序號
+python agent.py --termux -s "192.168.1.100:5555" --streaming
+```
+
+### 方法 2：使用 termux_mode.py（輕量互動）
 
 ```bash
 # 設定 API Key
@@ -108,27 +127,40 @@ python termux_mode.py
 - `ask <問題>` - 詢問 Gemini 關於螢幕內容
 - `quit` - 退出
 
-### 範例對話
+### agent.py Termux 模式功能
+
+使用 `--termux` 標誌時：
+- ✅ 自動使用 ADB 截圖（不需要 scrcpy 視頻流）
+- ✅ 自動禁用 OpenCV GUI（因為 Termux 沒有圖形界面）
+- ✅ 支援無線 ADB 配對和連接
+- ✅ 同時支援 `GOOGLE_API_KEY` 和 `GEMINI_API_KEY` 環境變數
+- ✅ 完整的 AI Agent 功能（思考、工具調用等）
+
+### 範例對話（agent.py）
 
 ```
->>> ss
-✅ Screenshot saved: /tmp/screen_1703001234.png
+$ python agent.py --termux --streaming
 
->>> ask 畫面上有什麼 App？
-📸 Capturing screen...
-🤖 Asking Gemini...
+📱 Termux detected, enabling ADB mode automatically
+✅ Using device: 192.168.1.100:5555
+Running in ADB Mode (1-2s per frame latency).
+✨ Streaming mode enabled - you will see real-time thinking process
 
-我在螢幕上看到以下 App：
-- Chrome 瀏覽器
-- Settings 設定
-- Play Store
-...
+Enter instruction (or 'q' to quit): 打開 Chrome 並搜尋今天天氣
 
->>> tap 540 1200
-✅ Tapped at (540, 1200)
+--- Turn 1 ---
+💭 Thinking (streaming)...
 
->>> back
-✅ Back pressed
+我看到手機主畫面，有幾個 app 圖示...
+我需要找到 Chrome 的圖示並點擊它。
+
+Function call: launch_package({'package_name': 'com.android.chrome'})
+ACTION: Launch package 'com.android.chrome'
+
+--- Turn 2 ---
+💭 Thinking (streaming)...
+
+Chrome 已經打開，我看到搜尋欄...
 ```
 
 ## ❓ 常見問題

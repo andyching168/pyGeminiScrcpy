@@ -574,9 +574,19 @@ class GeminiAgent:
         """Capture current screen and return as PNG bytes."""
         # Termux mode without OpenCV - get raw PNG bytes
         if self.use_adb_fallback and not HAS_CV2:
+            print(f"[DEBUG] Taking screenshot (use_shizuku={self.use_shizuku})")
+            
             # Try up to 3 times
             for attempt in range(3):
+                print(f"[DEBUG] Screenshot attempt {attempt + 1}/3...")
                 png_bytes = self.get_adb_screenshot_bytes()
+                
+                # Debug output
+                if png_bytes is None:
+                    print(f"[DEBUG] Got None from get_adb_screenshot_bytes()")
+                else:
+                    is_valid = self._validate_png(png_bytes)
+                    print(f"[DEBUG] Got {len(png_bytes)} bytes, valid_png={is_valid}, first_8={png_bytes[:8] if len(png_bytes) >= 8 else 'too short'}")
                 
                 if png_bytes and self._validate_png(png_bytes) and len(png_bytes) > 1000:
                     # Try to get dimensions from PNG header (width/height at bytes 16-24)
@@ -586,6 +596,7 @@ class GeminiAgent:
                         try:
                             self.width = struct.unpack('>I', png_bytes[16:20])[0]
                             self.height = struct.unpack('>I', png_bytes[20:24])[0]
+                            print(f"[DEBUG] Screenshot OK: {self.width}x{self.height}, {len(png_bytes)} bytes")
                         except:
                             pass  # Keep default dimensions
                     
@@ -594,7 +605,7 @@ class GeminiAgent:
                 # Screenshot failed or corrupted, retry
                 if attempt < 2:
                     print(f"Screenshot attempt {attempt + 1} failed, retrying...")
-                    time.sleep(0.5)
+                    time.sleep(1)  # Longer wait
             
             raise RuntimeError("No screen frame available after 3 attempts")
         

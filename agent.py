@@ -221,19 +221,80 @@ class GeminiAgent:
         """Check if termux-notification is available."""
         if not IS_TERMUX:
             return
+        
+        # Try multiple methods to find termux-notification
+        termux_bin_paths = [
+            "/data/data/com.termux/files/usr/bin/termux-notification",
+            os.path.expanduser("~/../usr/bin/termux-notification"),
+        ]
+        
+        # Method 1: Check known paths
+        for path in termux_bin_paths:
+            if os.path.exists(path):
+                self.notifications_enabled = True
+                print(f"🔔 Termux notifications enabled (found at {path})")
+                # Test notification
+                self._test_notification()
+                return
+        
+        # Method 2: Try which command
         try:
             result = subprocess.run(
                 ["which", "termux-notification"],
+                capture_output=True,
+                text=True,
+                timeout=5
+            )
+            if result.returncode == 0 and result.stdout.strip():
+                self.notifications_enabled = True
+                print(f"🔔 Termux notifications enabled (via which: {result.stdout.strip()})")
+                self._test_notification()
+                return
+        except Exception as e:
+            print(f"⚠️ which command failed: {e}")
+        
+        # Method 3: Try running it directly
+        try:
+            result = subprocess.run(
+                ["termux-notification", "--help"],
                 capture_output=True,
                 timeout=5
             )
             if result.returncode == 0:
                 self.notifications_enabled = True
-                print("🔔 Termux notifications enabled")
-            else:
-                print("💡 Install Termux:API for notifications: pkg install termux-api")
-        except:
+                print("🔔 Termux notifications enabled (direct test)")
+                self._test_notification()
+                return
+        except FileNotFoundError:
             pass
+        except Exception as e:
+            print(f"⚠️ Direct test failed: {e}")
+        
+        print("💡 Notifications not available. Install with:")
+        print("   pkg install termux-api")
+        print("   Also install Termux:API app from F-Droid")
+    
+    def _test_notification(self):
+        """Send a test notification to verify it works."""
+        try:
+            cmd = [
+                "termux-notification",
+                "--id", "gemini_test",
+                "--title", "🤖 Gemini Agent",
+                "--content", "Notifications working!",
+            ]
+            result = subprocess.run(cmd, capture_output=True, timeout=5)
+            if result.returncode == 0:
+                print("   ✓ Test notification sent!")
+                # Remove test notification after 2 seconds
+                time.sleep(1)
+                subprocess.run(["termux-notification-remove", "gemini_test"], capture_output=True, timeout=5)
+            else:
+                print(f"   ⚠️ Test notification failed: {result.stderr.decode() if result.stderr else 'unknown error'}")
+                self.notifications_enabled = False
+        except Exception as e:
+            print(f"   ⚠️ Test notification error: {e}")
+            self.notifications_enabled = False
     
     def send_notification(self, title: str, content: str, action_type: str = "info"):
         """Send a Termux notification."""
@@ -266,10 +327,14 @@ class GeminiAgent:
                 "--alert-once",  # Don't make sound every update
             ]
             
-            subprocess.run(cmd, capture_output=True, timeout=5)
+            result = subprocess.run(cmd, capture_output=True, timeout=5)
+            if result.returncode != 0:
+                # Log error once, then disable notifications
+                print(f"⚠️ Notification failed, disabling: {result.stderr.decode() if result.stderr else ''}")
+                self.notifications_enabled = False
         except Exception as e:
-            # Silently fail - notifications are optional
-            pass
+            print(f"⚠️ Notification error: {e}")
+            self.notifications_enabled = False
     
     def clear_notification(self):
         """Clear the ongoing notification."""

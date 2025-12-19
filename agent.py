@@ -9,6 +9,19 @@ from typing import Optional, Dict, Any, List
 # Termux detection - set before importing OpenCV
 IS_TERMUX = os.path.exists("/data/data/com.termux")
 
+# Shizuku shell (optional - for running without WiFi ADB)
+SHIZUKU_SHELL = None
+try:
+    from shizuku_setup import ShizukuShell
+    _shizuku = ShizukuShell()
+    if _shizuku.available and _shizuku.check_shizuku_running():
+        SHIZUKU_SHELL = _shizuku
+        print("🔰 Shizuku mode available!")
+except ImportError:
+    pass
+except Exception as e:
+    print(f"⚠️ Shizuku check failed: {e}")
+
 # Try to import OpenCV (optional for Termux)
 try:
     import cv2
@@ -216,6 +229,10 @@ class GeminiAgent:
         self.notification_id = "gemini_agent"
         self.current_turn = 0
         self._check_termux_notification()
+        
+        # Shizuku shell support (for running without WiFi ADB)
+        self.shizuku_shell = SHIZUKU_SHELL
+        self.use_shizuku = SHIZUKU_SHELL is not None
     
     def _check_termux_notification(self):
         """Check if termux-notification is available."""
@@ -432,9 +449,23 @@ class GeminiAgent:
 
 
     def get_adb_screenshot(self):
-        """Capture screenshot directly via ADB (Slower but reliable)"""
+        """Capture screenshot directly via ADB or Shizuku (Slower but reliable)"""
+        # Try Shizuku first if available
+        if self.use_shizuku and self.shizuku_shell:
+            try:
+                result = self.shizuku_shell.run_raw("screencap -p", timeout=10)
+                if result.returncode == 0 and result.stdout:
+                    if HAS_CV2:
+                        image_data = np.frombuffer(result.stdout, np.uint8)
+                        frame = cv2.imdecode(image_data, cv2.IMREAD_COLOR)
+                        return frame
+                    else:
+                        return result.stdout
+            except Exception as e:
+                print(f"Shizuku screenshot failed: {e}, trying ADB...")
+        
+        # Fall back to ADB
         try:
-            # Use device serial if set
             cmd = ["adb"]
             if hasattr(self, 'device_serial') and self.device_serial:
                 cmd.extend(["-s", self.device_serial])
@@ -457,7 +488,17 @@ class GeminiAgent:
             return None
 
     def get_adb_screenshot_bytes(self) -> bytes:
-        """Capture screenshot via ADB and return as PNG bytes (for Termux mode)."""
+        """Capture screenshot via ADB/Shizuku and return as PNG bytes (for Termux mode)."""
+        # Try Shizuku first if available
+        if self.use_shizuku and self.shizuku_shell:
+            try:
+                result = self.shizuku_shell.run_raw("screencap -p", timeout=10)
+                if result.returncode == 0 and result.stdout:
+                    return result.stdout
+            except Exception as e:
+                print(f"Shizuku screenshot failed: {e}, trying ADB...")
+        
+        # Fall back to ADB
         try:
             cmd = ["adb"]
             if hasattr(self, 'device_serial') and self.device_serial:
@@ -558,7 +599,19 @@ class GeminiAgent:
 
     # --- ADB Action Executors ---
     def _adb_shell(self, cmd_args):
-        """Run ADB shell command with device serial support."""
+        """Run shell command via Shizuku or ADB."""
+        # Try Shizuku first if available
+        if self.use_shizuku and self.shizuku_shell:
+            try:
+                command = " ".join(cmd_args)
+                code, stdout, stderr = self.shizuku_shell.run(command, timeout=10)
+                if code != 0 and stderr:
+                    print(f"Shizuku command warning: {stderr}")
+                return
+            except Exception as e:
+                print(f"Shizuku failed: {e}, trying ADB...")
+        
+        # Fall back to ADB
         cmd = ["adb"]
         if hasattr(self, 'device_serial') and self.device_serial:
             cmd.extend(["-s", self.device_serial])
@@ -1538,6 +1591,7 @@ def main():
     
     # Termux mode options
     parser.add_argument("--termux", action="store_true", help="Termux mode: use ADB, no GUI, wireless ADB support")
+    parser.add_argument("--shizuku", action="store_true", help="Use Shizuku instead of ADB (no WiFi needed)")
     parser.add_argument("--device", "-s", help="Device serial (IP:port for wireless ADB)")
     parser.add_argument("--pair", action="store_true", help="Pair with wireless ADB device first")
     parser.add_argument("--connect", type=str, help="Connect to wireless ADB device (IP:port)")
@@ -1545,13 +1599,27 @@ def main():
     
     args = parser.parse_args()
     
+    # Handle Shizuku mode
+    if args.shizuku:
+        if SHIZUKU_SHELL is None:
+            print("❌ Shizuku not available!")
+            print("\nTo use Shizuku mode:")
+            print("1. Install Shizuku app")
+            print("2. Start Shizuku service")
+            print("3. Run: python shizuku_setup.py install")
+            print("4. Try again")
+            return
+        print("🔰 Using Shizuku mode (no WiFi ADB needed)")
+        args.termux = True
+        args.use_adb = True
+    
     # Auto-detect Termux environment
-    if IS_TERMUX and not args.use_adb:
+    if IS_TERMUX and not args.use_adb and not args.shizuku:
         print("📱 Termux detected, enabling ADB mode automatically")
         args.termux = True
     
-    # Handle Termux/wireless ADB setup
-    if args.termux or args.pair or args.connect:
+    # Handle Termux/wireless ADB setup (skip if using Shizuku)
+    if (args.termux or args.pair or args.connect) and not args.shizuku:
         try:
             from wireless_adb import WirelessADB, interactive_setup
             wadb = WirelessADB()

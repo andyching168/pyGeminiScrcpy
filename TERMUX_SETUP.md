@@ -49,7 +49,50 @@ git clone https://github.com/yourusername/pyGeminiScrcpy.git
 cd pyGeminiScrcpy
 ```
 
-## 📶 無線 ADB 設定
+## 🔰 Shizuku 模式（推薦！不需要 WiFi）
+
+Shizuku 讓你無需 WiFi 也能在 Termux 執行 ADB 命令。
+
+### 安裝 Shizuku
+
+1. 從 Play Store 或 GitHub 安裝 **Shizuku** app
+2. 首次啟動 Shizuku（選擇其中一種）：
+   - 用 PC 的 ADB 啟動（一次性）
+   - 用無線 ADB 啟動（一次性）
+   - 用 Root 權限
+
+3. 在 Shizuku app 中：
+   - 點擊「**在終端機應用中使用 Shizuku**」
+   - 點擊「**導出文件**」
+   - 儲存到 Download 資料夾
+
+4. 在 Termux 設定 rish：
+```bash
+cd ~/pyGeminiScrcpy
+python shizuku_setup.py install
+python shizuku_setup.py check
+```
+
+### 使用 Shizuku 模式
+
+```bash
+# 使用 Shizuku 執行（不需要 WiFi ADB！）
+python agent.py --shizuku --streaming
+
+# 測試 Shizuku 是否正常
+python shizuku_setup.py test
+```
+
+### Shizuku 優點
+
+- ✅ **不需要 WiFi** - 隨時隨地使用
+- ✅ **不需要每次配對** - 啟動 Shizuku 後即可使用
+- ✅ **更快** - 直接執行命令，無網路延遲
+- ✅ **穩定** - 不會因為 WiFi 斷線而失效
+
+---
+
+## 📶 無線 ADB 設定（備用方案）
 
 ### 啟用無線調試（Android 11+）
 

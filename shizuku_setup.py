@@ -224,36 +224,59 @@ class ShizukuShell:
     
     def screenshot_bytes(self) -> Optional[bytes]:
         """Capture screenshot and return as bytes (for direct use)."""
-        temp_path = "/data/local/tmp/shizuku_screen.png"
+        # Use a path accessible by both Android system and Termux
+        # /data/local/tmp is accessible via rish
+        # But we'll also try /sdcard which might be readable by Python directly
         
-        try:
-            # Method 1: File-based (more reliable for binary data)
-            code, stdout, stderr = self.run(f"screencap -p {temp_path}", timeout=15)
-            if code == 0:
-                # Read the file using cat
+        for temp_path in ["/sdcard/shizuku_screen.png", "/data/local/tmp/shizuku_screen.png"]:
+            try:
+                # Take screenshot to file
+                code, stdout, stderr = self.run(f"screencap -p {temp_path}", timeout=15)
+                if code != 0:
+                    continue
+                
+                # Try to read directly with Python (avoids rish binary issues)
+                try:
+                    # Map /sdcard to Termux path
+                    python_path = temp_path
+                    if temp_path.startswith("/sdcard/"):
+                        python_path = "/storage/emulated/0/" + temp_path[8:]
+                    
+                    if os.path.exists(python_path):
+                        with open(python_path, 'rb') as f:
+                            data = f.read()
+                        # Clean up
+                        self.run(f"rm {temp_path}")
+                        
+                        if data and len(data) > 1000 and data[:8] == b'\x89PNG\r\n\x1a\n':
+                            print(f"[Shizuku] Direct file read success: {len(data)} bytes")
+                            return data
+                except Exception as e:
+                    print(f"[Shizuku] Direct read failed: {e}")
+                
+                # Fallback: Read with cat through rish
                 result = self.run_raw(f"cat {temp_path}", timeout=10)
-                # Clean up
                 self.run(f"rm {temp_path}")
                 
                 if result.returncode == 0 and result.stdout and len(result.stdout) > 1000:
-                    # Validate PNG
                     if result.stdout[:8] == b'\x89PNG\r\n\x1a\n':
                         return result.stdout
                     else:
-                        print(f"[Shizuku] File method got invalid PNG header")
-            
-            # Method 2: Direct stdout (fallback, may have binary issues)
+                        print(f"[Shizuku] cat method got corrupted data")
+                        
+            except Exception as e:
+                print(f"[Shizuku] Screenshot to {temp_path} failed: {e}")
+        
+        # Last resort: Direct stdout (usually corrupted)
+        try:
             result = self.run_raw("screencap -p", timeout=15)
             if result.returncode == 0 and result.stdout and len(result.stdout) > 1000:
                 if result.stdout[:8] == b'\x89PNG\r\n\x1a\n':
                     return result.stdout
-                else:
-                    print(f"[Shizuku] Direct stdout got invalid PNG header: {result.stdout[:8]}")
-            
-            return None
-        except Exception as e:
-            print(f"Screenshot failed: {e}")
-            return None
+        except:
+            pass
+        
+        return None
     
     def tap(self, x: int, y: int):
         """Tap at coordinates."""

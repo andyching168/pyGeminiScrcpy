@@ -168,17 +168,22 @@ class GeminiAgent:
         
         # Conversation history for multi-turn
         self.contents: List[Content] = []
+        
+        # Manual intervention: skip to next turn with optional hint
+        self.skip_to_next_turn = False
+        self.user_hint = ""  # Optional user message when skipping
+        self.skip_lock = threading.Lock()
 
     def get_config(self) -> types.GenerateContentConfig:
         """Build configuration with generic tools for Android."""
         return types.GenerateContentConfig(
             system_instruction=SYSTEM_PROMPT.format(width=self.width, height=self.height),
             tools=get_tool_definitions(),
-            # 增加思考配置，讓模型在輸出指令前先「思考」
+            # 思考配置：medium 模式平衡思考深度與速度
+            # thinking_budget: 0=關閉, -1=動態, 1-24576=固定預算
             thinking_config=types.ThinkingConfig(
                 include_thoughts=True,
-                # 對於需要高精確座標的任務，建議設為 medium 或 high
-                # 但注意：這會增加 Token 消耗與延遲
+                thinking_budget=8192,  # medium: 適合需要座標精確的任務
             ),
             # 降低溫度以減少幻覺，提高準確性
             temperature=0.0,  # 0.0 = 最確定性，1.0+ = 更有創意但可能幻覺
@@ -194,6 +199,27 @@ class GeminiAgent:
             self.last_frame = frame
             if self.width == 0:
                 self.height, self.width, _ = frame.shape
+    
+    def check_and_reset_skip(self) -> tuple:
+        """Check if user wants to skip to next turn, and reset the flag.
+        Returns (should_skip, user_hint)"""
+        with self.skip_lock:
+            if self.skip_to_next_turn:
+                self.skip_to_next_turn = False
+                hint = self.user_hint
+                self.user_hint = ""
+                return True, hint
+            return False, ""
+    
+    def request_skip_with_hint(self, hint: str = ""):
+        """Request to skip current turn with an optional hint message."""
+        with self.skip_lock:
+            self.skip_to_next_turn = True
+            self.user_hint = hint
+            if hint:
+                print(f"\n💬 User hint received: {hint}")
+            print("⏭️  Skip signal - moving to next turn...\n")
+
 
     def get_adb_screenshot(self):
         """Capture screenshot directly via ADB (Slower but reliable)"""
@@ -614,43 +640,128 @@ class GeminiAgent:
                     config=config,
                 )
                 
-                # Collect all parts from stream
-                all_parts = []
-                current_text = ""
+                # Collect parts from stream - we need to track the best parts seen
+                # because the last chunk might not contain function_calls
+                displayed_text_length = 0
+                best_parts = []  # Parts with most content (esp. function_calls)
+                streaming_interrupted = False
+                thinking_start_time = time.time()
+                THINKING_TIMEOUT = 20  # seconds
                 
                 for chunk in stream:
+                    # Check for thinking timeout (20 seconds)
+                    elapsed = time.time() - thinking_start_time
+                    if elapsed > THINKING_TIMEOUT:
+                        print(f"\n⏱️  Thinking timeout ({THINKING_TIMEOUT}s), moving to next turn...")
+                        streaming_interrupted = True
+                        user_hint = ""
+                        break
+                    
+                    # Check for skip signal during streaming (allows interruption of slow API)
+                    should_skip, user_hint = self.check_and_reset_skip()
+                    if should_skip:
+                        print("\n⏭️  Interrupting streaming, will re-evaluate...")
+                        streaming_interrupted = True
+                        break
+                    
                     if chunk.candidates and len(chunk.candidates) > 0:
                         candidate = chunk.candidates[0]
                         if candidate.content and candidate.content.parts:
-                            for part in candidate.content.parts:
-                                # Display text as it streams
+                            current_parts = list(candidate.content.parts)
+                            
+                            # Check if this chunk has function_calls
+                            has_function_call = any(
+                                hasattr(p, 'function_call') and p.function_call 
+                                for p in current_parts
+                            )
+                            
+                            # Keep parts that have function_calls, or update if current has more content
+                            if has_function_call or len(current_parts) > len(best_parts):
+                                best_parts = current_parts
+                            
+                            # Display thought text in real-time
+                            for part in current_parts:
                                 if hasattr(part, 'text') and part.text:
-                                    new_text = part.text[len(current_text):]
-                                    if new_text:
-                                        print(new_text, end="", flush=True)
-                                        current_text = part.text
-                                
-                                # Collect all parts
-                                all_parts.append(part)
+                                    if hasattr(part, 'thought') and part.thought:
+                                        if len(part.text) > displayed_text_length:
+                                            new_text = part.text[displayed_text_length:]
+                                            print(new_text, end="", flush=True)
+                                            displayed_text_length = len(part.text)
                 
                 print()  # New line after streaming
                 
-                # Build complete content from collected parts
-                complete_content = Content(role="model", parts=all_parts)
+                # If streaming was interrupted, skip to next turn with fresh screenshot
+                if streaming_interrupted:
+                    time.sleep(0.3)
+                    screenshot_bytes = self._get_screenshot_bytes()
+                    
+                    # Build interrupt message with optional user hint
+                    if user_hint:
+                        interrupt_msg = f"[USER INTERRUPTION] User says: {user_hint}\nPlease re-observe the screen and adjust your approach accordingly."
+                    else:
+                        interrupt_msg = "[USER INTERRUPTED DURING THINKING] Please re-observe the screen and reconsider."
+                    
+                    self.contents.append(Content(
+                        role="user",
+                        parts=[
+                            Part(text=interrupt_msg),
+                            Part.from_bytes(data=screenshot_bytes, mime_type='image/png')
+                        ]
+                    ))
+                    continue
+                
+                # Use the best_parts we collected (which should have function_calls if any)
+                final_parts = best_parts
+                
+                # Build complete content from final parts
+                complete_content = Content(role="model", parts=final_parts)
                 self.contents.append(complete_content)
                 
-                # Check for function calls
-                function_calls = [part.function_call for part in all_parts if hasattr(part, 'function_call') and part.function_call]
+                
+                # Check for function calls (use final_parts)
+                function_calls = [part.function_call for part in final_parts if hasattr(part, 'function_call') and part.function_call]
                 
                 if not function_calls:
                     # No function calls - agent might be done or thinking
-                    text_response = " ".join([part.text for part in all_parts if hasattr(part, 'text') and part.text])
+                    text_response = " ".join([part.text for part in final_parts if hasattr(part, 'text') and part.text])
                     if "TASK_FINISHED" in text_response:
                         return "Task Completed."
                     if "ERROR_STUCK" in text_response:
                         return f"Task Failed: {text_response}"
                     
                     return text_response if text_response else "Task completed (no response text)"
+                
+                # Check if user requested to skip to next turn
+                should_skip, user_hint = self.check_and_reset_skip()
+                if should_skip:
+                    print("\n" + "="*60)
+                    print("⏭️  USER INTERRUPTION - Skipping planned actions")
+                    if user_hint:
+                        print(f"💬 User: {user_hint}")
+                    print("🔄 Forcing AI to re-evaluate the situation...")
+                    print("="*60 + "\n")
+                    
+                    # Capture current state without executing actions
+                    time.sleep(0.5)
+                    screenshot_bytes = self._get_screenshot_bytes()
+                    
+                    # Build interrupt message with optional user hint
+                    if user_hint:
+                        interrupt_msg = f"[USER INTERRUPTION] User says: {user_hint}\nPlease re-observe the screen and adjust your approach accordingly."
+                    else:
+                        interrupt_msg = ("[IMPORTANT] User has interrupted the planned actions. "
+                                        "The situation may have changed or your plan may not be optimal. "
+                                        "Please carefully observe the current screen state and reconsider your approach. "
+                                        "What do you see now? What should be the next best action?")
+                    
+                    self.contents.append(Content(
+                        role="user",
+                        parts=[
+                            Part(text=interrupt_msg),
+                            Part.from_bytes(data=screenshot_bytes, mime_type='image/png')
+                        ]
+                    ))
+                    continue
                 
                 # Execute function calls
                 print(f"\n🎯 Executing {len(function_calls)} action(s)...")
@@ -661,9 +772,9 @@ class GeminiAgent:
                     time.sleep(0.5)
                     results.append((fc.name, result))
                 
-                # Capture new state
+                # Capture new state (wait 1s for UI to update)
                 print("📸 Capturing state...")
-                time.sleep(0.5)
+                time.sleep(1.0)  # 延遲 1 秒讓畫面更新
                 screenshot_bytes = self._get_screenshot_bytes()
                 
                 # Build function responses
@@ -749,6 +860,38 @@ class GeminiAgent:
                     # For now, if no tool calls and no special keywords, return response (legacy behavior)
                     return text_response if text_response else "Task completed (no response text)"
                 
+                # Check if user requested to skip to next turn
+                should_skip, user_hint = self.check_and_reset_skip()
+                if should_skip:
+                    print("\n" + "="*60)
+                    print("⏭️  USER INTERRUPTION - Skipping planned actions")
+                    if user_hint:
+                        print(f"💬 User: {user_hint}")
+                    print("🔄 Forcing AI to re-evaluate the situation...")
+                    print("="*60 + "\n")
+                    
+                    # Capture current state without executing actions
+                    time.sleep(0.5)
+                    screenshot_bytes = self._get_screenshot_bytes()
+                    
+                    # Build interrupt message with optional user hint
+                    if user_hint:
+                        interrupt_msg = f"[USER INTERRUPTION] User says: {user_hint}\nPlease re-observe the screen and adjust your approach accordingly."
+                    else:
+                        interrupt_msg = ("[IMPORTANT] User has interrupted the planned actions. "
+                                        "The situation may have changed or your plan may not be optimal. "
+                                        "Please carefully observe the current screen state and reconsider your approach. "
+                                        "What do you see now? What should be the next best action?")
+                    
+                    self.contents.append(Content(
+                        role="user",
+                        parts=[
+                            Part(text=interrupt_msg),
+                            Part.from_bytes(data=screenshot_bytes, mime_type='image/png')
+                        ]
+                    ))
+                    continue
+                
                 # Execute function calls
                 print(f"Executing {len(function_calls)} action(s)...")
                 results = []
@@ -758,9 +901,9 @@ class GeminiAgent:
                     time.sleep(0.5)  # Small delay between actions
                     results.append((fc.name, result))
                 
-                # Capture new state
+                # Capture new state (wait 1s for UI to update)
                 print("Capturing state...")
-                time.sleep(0.5)  # Wait for UI to update
+                time.sleep(1.0)  # 延遲 1 秒讓畫面更新
                 screenshot_bytes = self._get_screenshot_bytes()
                 
                 # Build function responses with screenshot in each response
@@ -794,6 +937,46 @@ class GeminiAgent:
 def on_frame(frame):
     if frame is not None and agent is not None:
         agent.update_frame(frame)
+
+
+def keyboard_listener_thread(agent_instance):
+    """Background thread to listen for keyboard input to trigger skip with optional hint."""
+    import sys
+    import select
+    
+    print("\n💡 Tips:")
+    print("   - Press Enter alone: Skip to next turn")
+    print("   - Type a message + Enter: Send hint to AI and skip")
+    print("   - Type 'q' + Enter: Quit when in instruction prompt\n")
+    
+    while True:
+        try:
+            # Check if there's input available (non-blocking on Unix)
+            if sys.platform != 'win32':
+                # Use select for non-blocking input on Unix/Mac
+                if select.select([sys.stdin], [], [], 0.5)[0]:
+                    line = sys.stdin.readline().strip()
+                    if line.lower() == 'q':
+                        break
+                    elif line == '' or line.lower() == 's':
+                        # Empty line or 's' = simple skip
+                        agent_instance.request_skip_with_hint("")
+                    else:
+                        # Any other input = skip with hint message
+                        agent_instance.request_skip_with_hint(line)
+            else:
+                # Windows: simplified handling
+                import msvcrt
+                if msvcrt.kbhit():
+                    char = msvcrt.getch().decode('utf-8')
+                    if char == '\r':  # Enter
+                        agent_instance.request_skip_with_hint("")
+                    elif char.lower() == 'q':
+                        break
+                time.sleep(0.5)
+        except Exception as e:
+            # Ignore errors in listener thread
+            pass
 
 
 agent = None
@@ -856,6 +1039,10 @@ def main():
     
     if args.streaming:
         print("✨ Streaming mode enabled - you will see real-time thinking process")
+    
+    # Start keyboard listener thread for manual intervention
+    listener_thread = threading.Thread(target=keyboard_listener_thread, args=(agent,), daemon=True)
+    listener_thread.start()
 
     if args.instruction:
         print(f"Executing: {args.instruction}")

@@ -1378,10 +1378,12 @@ class GeminiAgent:
                     text_response = " ".join([part.text for part in final_parts if hasattr(part, 'text') and part.text])
                     if "TASK_FINISHED" in text_response:
                         self.send_notification("Task Completed", "✅ Successfully finished!", "done")
+                        self.send_toast("✅ 任務完成！", short=False)
                         self.clear_notification()
                         return "Task Completed."
                     if "ERROR_STUCK" in text_response:
                         self.send_notification("Task Failed", text_response[:50], "error")
+                        self.send_toast("❌ 任務失敗", short=False)
                         self.clear_notification()
                         return f"Task Failed: {text_response}"
                     
@@ -1455,6 +1457,8 @@ class GeminiAgent:
         except Exception as e:
             print(f"Error: {e}")
             traceback.print_exc()
+            self.send_notification("Error", str(e)[:50], "error")
+            self.send_toast(f"❌ 錯誤: {str(e)[:30]}", short=False)
             return f"Error: {e}"
         finally:
             self.is_processing = False
@@ -1599,6 +1603,8 @@ class GeminiAgent:
         except Exception as e:
             print(f"Error: {e}")
             traceback.print_exc()
+            self.send_notification("Error", str(e)[:50], "error")
+            self.send_toast(f"❌ 錯誤: {str(e)[:30]}", short=False)
             return f"Error: {e}"
         finally:
             self.is_processing = False

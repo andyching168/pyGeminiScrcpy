@@ -224,19 +224,31 @@ class ShizukuShell:
     
     def screenshot_bytes(self) -> Optional[bytes]:
         """Capture screenshot and return as bytes (for direct use)."""
+        temp_path = "/data/local/tmp/shizuku_screen.png"
+        
         try:
-            result = self.run_raw("screencap -p", timeout=15)
-            if result.returncode == 0 and result.stdout and len(result.stdout) > 100:
-                return result.stdout
-            
-            # Fallback: save to temp file then read
-            temp_path = "/data/local/tmp/shizuku_screen.png"
-            code, _, _ = self.run(f"screencap -p {temp_path}", timeout=15)
+            # Method 1: File-based (more reliable for binary data)
+            code, stdout, stderr = self.run(f"screencap -p {temp_path}", timeout=15)
             if code == 0:
+                # Read the file using cat
                 result = self.run_raw(f"cat {temp_path}", timeout=10)
+                # Clean up
                 self.run(f"rm {temp_path}")
-                if result.returncode == 0 and result.stdout:
+                
+                if result.returncode == 0 and result.stdout and len(result.stdout) > 1000:
+                    # Validate PNG
+                    if result.stdout[:8] == b'\x89PNG\r\n\x1a\n':
+                        return result.stdout
+                    else:
+                        print(f"[Shizuku] File method got invalid PNG header")
+            
+            # Method 2: Direct stdout (fallback, may have binary issues)
+            result = self.run_raw("screencap -p", timeout=15)
+            if result.returncode == 0 and result.stdout and len(result.stdout) > 1000:
+                if result.stdout[:8] == b'\x89PNG\r\n\x1a\n':
                     return result.stdout
+                else:
+                    print(f"[Shizuku] Direct stdout got invalid PNG header: {result.stdout[:8]}")
             
             return None
         except Exception as e:

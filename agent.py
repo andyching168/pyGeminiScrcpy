@@ -640,15 +640,23 @@ class GeminiAgent:
                 print(f"Screenshot attempt {attempt + 1} failed (OpenCV mode), retrying...")
                 time.sleep(1)
         
-        # Last resort: try raw bytes without OpenCV
+        # Last resort: try raw bytes without OpenCV (multiple attempts)
         if self.use_adb_fallback:
-            print("[DEBUG] OpenCV failed, trying raw PNG...")
-            try:
-                png_bytes = self.get_adb_screenshot_bytes()
-                if png_bytes and self._validate_png(png_bytes):
-                    return png_bytes
-            except:
-                pass
+            print("[DEBUG] OpenCV failed, trying raw PNG with file method...")
+            for attempt in range(3):
+                try:
+                    png_bytes = self.get_adb_screenshot_bytes()
+                    if png_bytes:
+                        if self._validate_png(png_bytes):
+                            print(f"[DEBUG] Raw PNG success: {len(png_bytes)} bytes")
+                            return png_bytes
+                        else:
+                            print(f"[DEBUG] Raw PNG invalid header: {png_bytes[:8] if len(png_bytes) >= 8 else 'empty'}")
+                except Exception as e:
+                    print(f"[DEBUG] Raw PNG attempt {attempt + 1} failed: {e}")
+                
+                if attempt < 2:
+                    time.sleep(1)
         
         raise RuntimeError("No screen frame available")
 

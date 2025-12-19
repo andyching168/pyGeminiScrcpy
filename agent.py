@@ -1086,17 +1086,81 @@ class GeminiAgent:
             self.send_notification(f"Turn {self.current_turn}", f"Unknown: {name}", "error")
             return {"status": "error", "message": f"Unknown function: {name}", "url": "android://device"}
 
+    def _compress_png(self, png_bytes: bytes, max_size: int = 800000) -> bytes:
+        """Compress PNG if too large (for Gemini API limits)."""
+        if len(png_bytes) <= max_size:
+            return png_bytes
+        
+        print(f"[DEBUG] Compressing image: {len(png_bytes)} bytes -> target {max_size}")
+        
+        # Try using PIL if available
+        try:
+            from PIL import Image
+            import io
+            
+            # Load image
+            img = Image.open(io.BytesIO(png_bytes))
+            
+            # Calculate resize ratio
+            ratio = (max_size / len(png_bytes)) ** 0.5
+            new_size = (int(img.width * ratio), int(img.height * ratio))
+            
+            # Resize
+            img = img.resize(new_size, Image.Resampling.LANCZOS)
+            
+            # Save as JPEG (smaller than PNG)
+            output = io.BytesIO()
+            img.save(output, format='JPEG', quality=85)
+            result = output.getvalue()
+            print(f"[DEBUG] Compressed with PIL: {len(result)} bytes, {new_size[0]}x{new_size[1]}")
+            return result
+        except ImportError:
+            pass
+        except Exception as e:
+            print(f"[DEBUG] PIL compression failed: {e}")
+        
+        # Try using OpenCV if available
+        if HAS_CV2:
+            try:
+                # Decode PNG
+                nparr = np.frombuffer(png_bytes, np.uint8)
+                img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+                
+                if img is not None:
+                    # Calculate resize ratio
+                    ratio = (max_size / len(png_bytes)) ** 0.5
+                    new_size = (int(img.shape[1] * ratio), int(img.shape[0] * ratio))
+                    
+                    # Resize
+                    img = cv2.resize(img, new_size)
+                    
+                    # Encode as JPEG
+                    _, buffer = cv2.imencode('.jpg', img, [cv2.IMWRITE_JPEG_QUALITY, 85])
+                    result = buffer.tobytes()
+                    print(f"[DEBUG] Compressed with OpenCV: {len(result)} bytes")
+                    return result
+            except Exception as e:
+                print(f"[DEBUG] OpenCV compression failed: {e}")
+        
+        # Return original if compression failed
+        print(f"[DEBUG] Could not compress, using original")
+        return png_bytes
+
     def get_screenshot_part(self) -> Part:
         """Capture current screen and return as Part."""
         # Use shared method that handles both Termux and normal mode
         png_bytes = self._get_screenshot_bytes()
+        
+        # Compress if too large
+        compressed = self._compress_png(png_bytes)
+        mime_type = 'image/jpeg' if compressed != png_bytes else 'image/png'
         
         if self.debug_mode and HAS_CV2:
             # Update status for debug loop
             self.debug_status_text = "Sending to Gemini..."
             self.debug_status_expire_time = time.time() + 2.0
 
-        return Part.from_bytes(data=png_bytes, mime_type='image/png')
+        return Part.from_bytes(data=compressed, mime_type=mime_type)
 
     def _iter_stream_with_timeout(self, stream, timeout_per_chunk: float = 5.0):
         """Iterate over stream with timeout for each chunk.

@@ -334,7 +334,14 @@ class GeminiAgent:
             }
             icon = icons.get(action_type, "🤖")
             
-            # Build notification command
+            # Send toast (brief popup) - always try
+            toast_msg = f"{icon} {content}"
+            self.send_toast(toast_msg)
+            
+            # Send persistent notification
+            if not self.notifications_enabled:
+                return
+                
             cmd = [
                 "termux-notification",
                 "--id", self.notification_id,
@@ -363,6 +370,28 @@ class GeminiAgent:
                 capture_output=True,
                 timeout=5
             )
+        except:
+            pass
+    
+    def send_toast(self, message: str, short: bool = True):
+        """Send a toast message (brief popup)."""
+        if not IS_TERMUX:
+            return
+        
+        try:
+            cmd = [
+                "termux-toast",
+                "-g", "top",  # Position at top
+                "-b", "black",  # Background color
+                "-c", "white",  # Text color
+            ]
+            if short:
+                cmd.extend(["-s"])  # Short duration
+            cmd.append(message)
+            
+            subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        except FileNotFoundError:
+            pass  # termux-toast not available
         except:
             pass
 
@@ -504,12 +533,21 @@ class GeminiAgent:
         """Capture screenshot via ADB/Shizuku and return as PNG bytes (for Termux mode)."""
         # Try Shizuku first if available
         if self.use_shizuku and self.shizuku_shell:
+            # Try screenshot_bytes method (has better fallback)
             try:
-                result = self.shizuku_shell.run_raw("screencap -p", timeout=10)
-                if result.returncode == 0 and result.stdout:
+                png_bytes = self.shizuku_shell.screenshot_bytes()
+                if png_bytes and len(png_bytes) > 1000:
+                    return png_bytes
+            except Exception as e:
+                print(f"Shizuku screenshot_bytes failed: {e}")
+            
+            # Try direct screencap as fallback
+            try:
+                result = self.shizuku_shell.run_raw("screencap -p", timeout=15)
+                if result.returncode == 0 and result.stdout and len(result.stdout) > 1000:
                     return result.stdout
             except Exception as e:
-                print(f"Shizuku screenshot failed: {e}, trying ADB...")
+                print(f"Shizuku screencap failed: {e}, trying ADB...")
         
         # Fall back to ADB
         try:
@@ -523,26 +561,42 @@ class GeminiAgent:
         except Exception as e:
             print(f"ADB Screenshot failed: {e}")
             return None
+    
+    def _validate_png(self, data: bytes) -> bool:
+        """Check if data is a valid PNG."""
+        if not data or len(data) < 100:
+            return False
+        # PNG signature: 89 50 4E 47 0D 0A 1A 0A
+        png_sig = b'\x89PNG\r\n\x1a\n'
+        return data[:8] == png_sig
 
     def _get_screenshot_bytes(self) -> bytes:
         """Capture current screen and return as PNG bytes."""
-        # Termux mode without OpenCV - get raw PNG bytes from ADB
+        # Termux mode without OpenCV - get raw PNG bytes
         if self.use_adb_fallback and not HAS_CV2:
-            png_bytes = self.get_adb_screenshot_bytes()
-            if png_bytes is None:
-                raise RuntimeError("No screen frame available")
+            # Try up to 3 times
+            for attempt in range(3):
+                png_bytes = self.get_adb_screenshot_bytes()
+                
+                if png_bytes and self._validate_png(png_bytes) and len(png_bytes) > 1000:
+                    # Try to get dimensions from PNG header (width/height at bytes 16-24)
+                    if len(png_bytes) > 24:
+                        import struct
+                        # PNG IHDR chunk contains width (4 bytes) and height (4 bytes) at offset 16
+                        try:
+                            self.width = struct.unpack('>I', png_bytes[16:20])[0]
+                            self.height = struct.unpack('>I', png_bytes[20:24])[0]
+                        except:
+                            pass  # Keep default dimensions
+                    
+                    return png_bytes
+                
+                # Screenshot failed or corrupted, retry
+                if attempt < 2:
+                    print(f"Screenshot attempt {attempt + 1} failed, retrying...")
+                    time.sleep(0.5)
             
-            # Try to get dimensions from PNG header (width/height at bytes 16-24)
-            if len(png_bytes) > 24:
-                import struct
-                # PNG IHDR chunk contains width (4 bytes) and height (4 bytes) at offset 16
-                try:
-                    self.width = struct.unpack('>I', png_bytes[16:20])[0]
-                    self.height = struct.unpack('>I', png_bytes[20:24])[0]
-                except:
-                    pass  # Keep default dimensions
-            
-            return png_bytes
+            raise RuntimeError("No screen frame available after 3 attempts")
         
         # Normal mode with OpenCV
         frame = None

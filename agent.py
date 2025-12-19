@@ -192,6 +192,9 @@ class GeminiAgent:
         
         # Cache installed packages
         self.app_list = self._get_installed_packages()
+        
+        # State to coordinate input between main loop and listener thread
+        self.is_processing = False
 
     def _get_installed_packages(self) -> List[str]:
         """Get list of installed 3rd party packages via ADB."""
@@ -677,8 +680,56 @@ class GeminiAgent:
 
         return Part.from_bytes(data=png_bytes, mime_type='image/png')
 
+    def _iter_stream_with_timeout(self, stream, timeout_per_chunk: float = 5.0):
+        """Iterate over stream with timeout for each chunk.
+        
+        Uses a background thread to fetch chunks, allowing the main thread
+        to check for timeouts and skip signals even when API is blocking.
+        
+        Yields: (chunk, timed_out) tuples
+        - chunk: the stream chunk, or None if timed out
+        - timed_out: True if this iteration timed out waiting for a chunk
+        """
+        import queue
+        
+        chunk_queue = queue.Queue()
+        stream_done = threading.Event()
+        
+        def fetch_chunks():
+            """Background thread to fetch chunks from stream."""
+            try:
+                for chunk in stream:
+                    chunk_queue.put(('chunk', chunk))
+                chunk_queue.put(('done', None))
+            except Exception as e:
+                chunk_queue.put(('error', e))
+            finally:
+                stream_done.set()
+        
+        fetch_thread = threading.Thread(target=fetch_chunks, daemon=True)
+        fetch_thread.start()
+        
+        while not stream_done.is_set() or not chunk_queue.empty():
+            try:
+                item_type, item = chunk_queue.get(timeout=timeout_per_chunk)
+                if item_type == 'chunk':
+                    yield item, False
+                elif item_type == 'error':
+                    raise item
+                elif item_type == 'done':
+                    break
+            except queue.Empty:
+                # Timed out waiting for chunk
+                yield None, True
+
     def process_step_streaming(self, instruction: str) -> str:
         """Process a single instruction step with STREAMING for real-time thinking display."""
+        self.is_processing = True
+        # Reset manual intervention flags for new task
+        with self.skip_lock:
+            self.skip_to_next_turn = False
+            self.user_hint = ""
+            
         try:
             # Clear conversation history for new instruction
             self.contents = []
@@ -716,15 +767,17 @@ class GeminiAgent:
                 best_parts = []  # Parts with most content (esp. function_calls)
                 streaming_interrupted = False
                 thinking_start_time = time.time()
-                THINKING_TIMEOUT = 20  # seconds
+                THINKING_TIMEOUT = 20  # seconds - total timeout for thinking
+                CHUNK_TIMEOUT = 3  # seconds - timeout per chunk (allows checking skip/timeout)
+                user_hint = ""
                 
-                for chunk in stream:
-                    # Check for thinking timeout (20 seconds)
+                # Use timeout-enabled iterator to prevent blocking
+                for chunk, timed_out in self._iter_stream_with_timeout(stream, timeout_per_chunk=CHUNK_TIMEOUT):
+                    # Check for thinking timeout (20 seconds total)
                     elapsed = time.time() - thinking_start_time
                     if elapsed > THINKING_TIMEOUT:
                         print(f"\n⏱️  Thinking timeout ({THINKING_TIMEOUT}s), moving to next turn...")
                         streaming_interrupted = True
-                        user_hint = ""
                         break
                     
                     # Check for skip signal during streaming (allows interruption of slow API)
@@ -734,7 +787,12 @@ class GeminiAgent:
                         streaming_interrupted = True
                         break
                     
-                    if chunk.candidates and len(chunk.candidates) > 0:
+                    # If timed out waiting for chunk, just continue to check timeout/skip again
+                    if timed_out:
+                        print(".", end="", flush=True)  # Visual indicator that we're waiting
+                        continue
+                    
+                    if chunk and chunk.candidates and len(chunk.candidates) > 0:
                         candidate = chunk.candidates[0]
                         if candidate.content and candidate.content.parts:
                             current_parts = list(candidate.content.parts)
@@ -869,10 +927,18 @@ class GeminiAgent:
             print(f"Error: {e}")
             traceback.print_exc()
             return f"Error: {e}"
+        finally:
+            self.is_processing = False
 
 
     def process_step(self, instruction: str) -> str:
         """Process a single instruction step with the agent loop."""
+        self.is_processing = True
+        # Reset manual intervention flags for new task
+        with self.skip_lock:
+            self.skip_to_next_turn = False
+            self.user_hint = ""
+
         try:
             # Clear conversation history for new instruction
             self.contents = []
@@ -922,12 +988,15 @@ class GeminiAgent:
                     # No function calls - agent might be done or thinking
                     text_response = " ".join([part.text for part in candidate.content.parts if part.text])
                     if "TASK_FINISHED" in text_response:
+                        self.is_processing = False
                         return "Task Completed."
                     if "ERROR_STUCK" in text_response:
+                        self.is_processing = False
                         return f"Task Failed: {text_response}"
                     
                     # If model just talks without tool calls, we print it but might want to continue depending on logic?
                     # For now, if no tool calls and no special keywords, return response (legacy behavior)
+                    self.is_processing = False
                     return text_response if text_response else "Task completed (no response text)"
                 
                 # Check if user requested to skip to next turn
@@ -1002,6 +1071,8 @@ class GeminiAgent:
             print(f"Error: {e}")
             traceback.print_exc()
             return f"Error: {e}"
+        finally:
+            self.is_processing = False
 
 
     print("Starting Main Loop...")
@@ -1128,13 +1199,25 @@ def keyboard_listener_thread(agent_instance):
     
     while True:
         try:
+            # Only listen if agent is actively processing a task
+            if not agent_instance.is_processing:
+                time.sleep(0.5)
+                continue
+
             # Check if there's input available (non-blocking on Unix)
             if sys.platform != 'win32':
                 # Use select for non-blocking input on Unix/Mac
                 if select.select([sys.stdin], [], [], 0.5)[0]:
                     line = sys.stdin.readline().strip()
+                else:
+                    line = None
+                    
+                if line is not None:
                     if line.lower() == 'q':
-                        break
+                        # In processing mode, q acts as skip/cancel or we could ignore
+                        # But typically q is for main loop quit. 
+                        # Let's treat it as a skip hint "quit/stop"
+                        agent_instance.request_skip_with_hint("User requested stop/quit")
                     elif line == '' or line.lower() == 's':
                         # Empty line or 's' = simple skip
                         agent_instance.request_skip_with_hint("")
@@ -1149,7 +1232,7 @@ def keyboard_listener_thread(agent_instance):
                     if char == '\r':  # Enter
                         agent_instance.request_skip_with_hint("")
                     elif char.lower() == 'q':
-                        break
+                         agent_instance.request_skip_with_hint("User requested stop/quit")
                 time.sleep(0.5)
         except Exception as e:
             # Ignore errors in listener thread

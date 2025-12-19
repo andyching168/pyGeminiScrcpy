@@ -214,9 +214,14 @@ class GeminiAgent:
     def _get_installed_packages(self) -> List[str]:
         """Get list of installed 3rd party packages via ADB."""
         try:
-            # Use -3 to list only third-party apps to reduce token usage and noise
+            # Build ADB command with optional device serial
+            cmd = ["adb"]
+            if hasattr(self, 'device_serial') and self.device_serial:
+                cmd.extend(["-s", self.device_serial])
+            cmd.extend(["shell", "pm", "list", "packages", "-3"])
+            
             result = subprocess.run(
-                ["adb", "shell", "pm", "list", "packages", "-3"],
+                cmd,
                 capture_output=True,
                 text=True
                 # Don't check=True here to avoid crashing if adb fails (e.g. device not connected yet)
@@ -372,7 +377,12 @@ class GeminiAgent:
         if self.real_width and self.real_height:
             return self.real_width, self.real_height
         try:
-            result = subprocess.run(["adb", "shell", "wm", "size"], capture_output=True, text=True, check=True)
+            cmd = ["adb"]
+            if hasattr(self, 'device_serial') and self.device_serial:
+                cmd.extend(["-s", self.device_serial])
+            cmd.extend(["shell", "wm", "size"])
+            
+            result = subprocess.run(cmd, capture_output=True, text=True, check=True)
             # Parse "Physical size: 1220x2712"
             for line in result.stdout.strip().split('\n'):
                 if 'Physical size' in line:
@@ -410,7 +420,12 @@ class GeminiAgent:
 
     # --- ADB Action Executors ---
     def _adb_shell(self, cmd_args):
-        subprocess.run(["adb", "shell"] + cmd_args)
+        """Run ADB shell command with device serial support."""
+        cmd = ["adb"]
+        if hasattr(self, 'device_serial') and self.device_serial:
+            cmd.extend(["-s", self.device_serial])
+        cmd.extend(["shell"] + cmd_args)
+        subprocess.run(cmd)
 
     def _execute_click_at(self, x: int, y: int):
         """Execute click at given coordinates."""
@@ -612,8 +627,13 @@ class GeminiAgent:
         
         # Method 1: Use monkey (most reliable for launcher apps)
         try:
+            cmd = ["adb"]
+            if hasattr(self, 'device_serial') and self.device_serial:
+                cmd.extend(["-s", self.device_serial])
+            cmd.extend(["shell", "monkey", "-p", package_name, "-c", "android.intent.category.LAUNCHER", "1"])
+            
             result = subprocess.run(
-                ["adb", "shell", "monkey", "-p", package_name, "-c", "android.intent.category.LAUNCHER", "1"],
+                cmd,
                 capture_output=True,
                 text=True,
                 timeout=5
@@ -1336,18 +1356,44 @@ def main():
             
             # Check connected devices
             devices = wadb.get_connected_devices()
-            if not devices:
+            active_devices = [d for d in devices if d['status'] == 'device']
+            
+            if not active_devices:
                 print("❌ No devices connected!")
                 print("   Use --pair to pair a device, or --connect IP:port to connect")
                 return
             
-            # Auto-select device if not specified
-            if not args.device:
-                for d in devices:
-                    if d['status'] == 'device':
-                        args.device = d['serial']
-                        print(f"✅ Using device: {args.device}")
-                        break
+            # Handle multiple devices
+            if len(active_devices) > 1 and not args.device:
+                print(f"\n📱 Multiple devices detected ({len(active_devices)}):")
+                for i, d in enumerate(active_devices):
+                    wireless = "📶" if d['is_wireless'] else "🔌"
+                    print(f"   [{i+1}] {wireless} {d['serial']}")
+                
+                print("\n💡 Please select a device:")
+                try:
+                    choice = input("   Enter number (or device serial): ").strip()
+                    if choice.isdigit():
+                        idx = int(choice) - 1
+                        if 0 <= idx < len(active_devices):
+                            args.device = active_devices[idx]['serial']
+                        else:
+                            print("❌ Invalid selection")
+                            return
+                    else:
+                        # Treat as serial
+                        args.device = choice
+                except (KeyboardInterrupt, EOFError):
+                    print("\nCancelled")
+                    return
+                
+                print(f"✅ Selected: {args.device}")
+            
+            # Auto-select device if only one available
+            elif not args.device and len(active_devices) == 1:
+                args.device = active_devices[0]['serial']
+                print(f"✅ Using device: {args.device}")
+                
         except ImportError:
             print("⚠️ wireless_adb.py not found, continuing with default ADB")
         except Exception as e:
